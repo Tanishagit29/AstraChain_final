@@ -1,0 +1,11 @@
+product_id,product_name,category,current_stock,demand,unit_cost,warehouse,expiry_date
+SKU-MILK-101,A2 Organic Fresh Milk 1L,Dairy,120,450,₹68,Mumbai Central Hub,2026-08-27
+SKU-YGRT-102,Greek Vanilla Yogurt 400g,Dairy,85,260,₹95,Mumbai Central Hub,2026-08-31
+SKU-PANE-103,Fresh Malai Paneer 500g,Dairy,140,310,₹180,Pune North Depot,2026-09-02
+SKU-BRED-104,Artisan Whole Wheat Bread,Bakery,210,380,₹45,Thane East Hub,2026-09-05
+SKU-BUTR-105,Pasteurized Table Butter 500g,Dairy,340,290,₹275,Mumbai Central Hub,2026-09-25
+SKU-RICE-106,Royal Basmati Rice 5kg,Staples,620,410,₹450,Pune North Depot,2027-02-15
+SKU-CHNA-107,Premium Kabuli Chana 1kg,Staples,480,220,₹140,Thane East Hub,2027-01-10
+SKU-APPL-108,Kashmir Royal Gala Apples 1kg,Produce,75,320,₹190,Mumbai Central Hub,2026-09-01
+SKU-TOFU-109,Organic Soya Tofu 250g,Produce,90,180,₹75,Pune North Depot,2026-09-04
+SKU-SALT-110,Iodized Table Salt 1kg,Staples,850,500,₹28,Thane East Hub,
