@@ -15,24 +15,28 @@ const FESTIVAL_OPTIONS = [
   'Holi',
   'Eid al-Fitr',
   'Ganesh Chaturthi',
-  'Christmas',
+  'Navratri',
+  'Durga Puja',
+  'Dussehra',
   'Raksha Bandhan',
+  'Christmas',
   'New Year',
   'Republic Day',
   'Independence Day',
+  'Janmashtami',
+  'Onam',
+  'Pongal',
+  'Karwa Chauth',
+  'Baisakhi',
+  'Chhath Puja',
+  'Maha Shivratri',
+  'Gandhi Jayanti',
 ];
 
 function FestivalItemDemandPredictor() {
   const [selectedFestival, setSelectedFestival] = useState('Diwali');
   const [itemDemandData, setItemDemandData] = useState(null);
-  const [calendar, setCalendar] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    api.getFestivalCalendar().then((res) => {
-      if (Array.isArray(res)) setCalendar(res);
-    });
-  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -239,28 +243,6 @@ function FestivalItemDemandPredictor() {
           </div>
         )}
       </div>
-
-      {/* Full reference calendar pill list */}
-      {calendar.length > 0 && (
-        <div className="space-y-xs">
-          <p className="text-[11px] font-mono text-on-surface-variant uppercase tracking-wider">Reference Festival Calendar:</p>
-          <div className="flex flex-wrap gap-xs">
-            {calendar.map((f) => (
-              <button
-                key={`${f.festival}-${f.date}`}
-                onClick={() => setSelectedFestival(f.festival)}
-                className={`rounded-full px-sm py-xs text-[11px] font-mono border transition-all cursor-pointer ${
-                  selectedFestival === f.festival
-                    ? 'bg-primary text-on-primary border-primary font-bold shadow-sm'
-                    : 'bg-surface-container-low border-outline-variant text-on-surface-variant hover:border-primary/50'
-                }`}
-              >
-                {f.festival} · {f.date}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

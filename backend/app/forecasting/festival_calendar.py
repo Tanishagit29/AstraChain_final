@@ -48,7 +48,16 @@ FESTIVALS: List[Dict] = [
         "window_before": 3,
         "window_after": 0,
         "category_multipliers": {
-            "Electronics": 1.25, "Clothing": 1.15, "Household": 1.1, "default": DEFAULT_MULTIPLIER,
+            "Electronics": 1.25, "Clothing": 1.15, "Household": 1.1, "Stationery": 1.4, "Bakery": 1.2, "default": DEFAULT_MULTIPLIER,
+        },
+    },
+    {
+        "name": "Maha Shivratri",
+        "dates": {2024: "2024-03-08", 2025: "2025-02-26", 2026: "2026-02-15", 2027: "2027-03-06"},
+        "window_before": 4,
+        "window_after": 1,
+        "category_multipliers": {
+            "Fruits & Vegetables": 1.65, "Dairy": 1.5, "Pooja & Religious": 1.8, "Bakery": 1.3, "default": DEFAULT_MULTIPLIER,
         },
     },
     {
@@ -57,8 +66,8 @@ FESTIVALS: List[Dict] = [
         "window_before": 5,
         "window_after": 1,
         "category_multipliers": {
-            "Household": 1.6, "Snacks": 1.45, "Bakery": 1.4, "Beverages": 1.35,
-            "Personal Care": 1.3, "Clothing": 1.2, "default": DEFAULT_MULTIPLIER,
+            "Household": 1.6, "Snacks": 1.55, "Bakery": 1.45, "Beverages": 1.5,
+            "Personal Care": 1.4, "Clothing": 1.2, "Colors & Festive Accessories": 2.2, "default": DEFAULT_MULTIPLIER,
         },
     },
     {
@@ -68,7 +77,16 @@ FESTIVALS: List[Dict] = [
         "window_after": 1,
         "category_multipliers": {
             "Clothing": 1.65, "Clothing Accessories": 1.5, "Bakery": 1.6, "Footwear": 1.35,
-            "Personal Care": 1.3, "Snacks": 1.4, "default": DEFAULT_MULTIPLIER,
+            "Personal Care": 1.4, "Snacks": 1.4, "Spices & Masala": 1.7, "Dates & Dry Fruits": 1.85, "default": DEFAULT_MULTIPLIER,
+        },
+    },
+    {
+        "name": "Baisakhi",
+        "dates": {2024: "2024-04-13", 2025: "2025-04-13", 2026: "2026-04-14", 2027: "2027-04-14"},
+        "window_before": 4,
+        "window_after": 1,
+        "category_multipliers": {
+            "Bakery": 1.5, "Grains & Pulses": 1.4, "Clothing": 1.35, "Snacks": 1.3, "default": DEFAULT_MULTIPLIER,
         },
     },
     {
@@ -77,7 +95,7 @@ FESTIVALS: List[Dict] = [
         "window_before": 3,
         "window_after": 0,
         "category_multipliers": {
-            "Electronics": 1.3, "Household": 1.15, "Clothing": 1.1, "default": DEFAULT_MULTIPLIER,
+            "Electronics": 1.35, "Household": 1.15, "Clothing": 1.2, "Stationery": 1.45, "Bakery": 1.25, "default": DEFAULT_MULTIPLIER,
         },
     },
     {
@@ -86,8 +104,26 @@ FESTIVALS: List[Dict] = [
         "window_before": 6,
         "window_after": 0,
         "category_multipliers": {
-            "Clothing Accessories": 1.55, "Bakery": 1.45, "Clothing": 1.3, "Snacks": 1.25,
-            "Personal Care": 1.2, "default": DEFAULT_MULTIPLIER,
+            "Clothing Accessories": 1.8, "Bakery": 1.65, "Clothing": 1.4, "Snacks": 1.35,
+            "Personal Care": 1.3, "Chocolates & Confectionery": 1.9, "default": DEFAULT_MULTIPLIER,
+        },
+    },
+    {
+        "name": "Janmashtami",
+        "dates": {2024: "2024-08-26", 2025: "2025-08-16", 2026: "2026-09-04", 2027: "2027-08-25"},
+        "window_before": 5,
+        "window_after": 1,
+        "category_multipliers": {
+            "Dairy": 1.8, "Bakery": 1.6, "Pooja & Religious": 1.75, "Fruits & Vegetables": 1.4, "Snacks": 1.3, "default": DEFAULT_MULTIPLIER,
+        },
+    },
+    {
+        "name": "Onam",
+        "dates": {2024: "2024-09-15", 2025: "2025-09-05", 2026: "2026-08-26", 2027: "2027-09-12"},
+        "window_before": 6,
+        "window_after": 1,
+        "category_multipliers": {
+            "Grains & Pulses": 1.6, "Clothing": 1.5, "Fruits & Vegetables": 1.45, "Household": 1.3, "Snacks": 1.35, "default": DEFAULT_MULTIPLIER,
         },
     },
     {
@@ -96,8 +132,27 @@ FESTIVALS: List[Dict] = [
         "window_before": 5,
         "window_after": 2,
         "category_multipliers": {
-            "Bakery": 1.7, "Fruits & Vegetables": 1.45, "Snacks": 1.4, "Household": 1.3,
-            "default": DEFAULT_MULTIPLIER,
+            "Bakery": 1.8, "Fruits & Vegetables": 1.5, "Snacks": 1.4, "Household": 1.35,
+            "Pooja & Religious": 1.85, "default": DEFAULT_MULTIPLIER,
+        },
+    },
+    {
+        "name": "Navratri",
+        "dates": {2024: "2024-10-03", 2025: "2025-09-22", 2026: "2026-10-11", 2027: "2027-09-30"},
+        "window_before": 7,
+        "window_after": 1,
+        "category_multipliers": {
+            "Pooja & Religious": 1.9, "Clothing": 1.6, "Fruits & Vegetables": 1.5, "Dairy": 1.4,
+            "Personal Care": 1.35, "default": DEFAULT_MULTIPLIER,
+        },
+    },
+    {
+        "name": "Durga Puja",
+        "dates": {2024: "2024-10-09", 2025: "2025-09-28", 2026: "2026-10-17", 2027: "2027-10-06"},
+        "window_before": 7,
+        "window_after": 1,
+        "category_multipliers": {
+            "Clothing": 1.8, "Footwear": 1.5, "Personal Care": 1.45, "Bakery": 1.5, "Electronics": 1.4, "default": DEFAULT_MULTIPLIER,
         },
     },
     {
@@ -113,8 +168,17 @@ FESTIVALS: List[Dict] = [
         "window_before": 5,
         "window_after": 1,
         "category_multipliers": {
-            "Electronics": 1.4, "Clothing": 1.35, "Footwear": 1.3, "Bakery": 1.3,
-            "Household": 1.2, "default": DEFAULT_MULTIPLIER,
+            "Electronics": 1.5, "Clothing": 1.45, "Footwear": 1.35, "Bakery": 1.4,
+            "Household": 1.3, "default": DEFAULT_MULTIPLIER,
+        },
+    },
+    {
+        "name": "Karwa Chauth",
+        "dates": {2024: "2024-10-20", 2025: "2025-10-09", 2026: "2026-10-29", 2027: "2027-10-18"},
+        "window_before": 4,
+        "window_after": 0,
+        "category_multipliers": {
+            "Clothing Accessories": 1.8, "Personal Care": 1.7, "Bakery": 1.5, "Clothing": 1.6, "default": DEFAULT_MULTIPLIER,
         },
     },
     {
@@ -123,9 +187,18 @@ FESTIVALS: List[Dict] = [
         "window_before": 10,
         "window_after": 1,
         "category_multipliers": {
-            "Electronics": 1.9, "Clothing": 1.7, "Clothing Accessories": 1.6, "Bakery": 2.1,
-            "Snacks": 1.8, "Household": 1.55, "Personal Care": 1.4, "Footwear": 1.35,
-            "Beverages": 1.3, "Books": 1.2, "default": 1.15,
+            "Electronics": 1.95, "Clothing": 1.75, "Clothing Accessories": 1.65, "Bakery": 2.1,
+            "Snacks": 1.85, "Household": 1.6, "Personal Care": 1.45, "Footwear": 1.4,
+            "Beverages": 1.35, "Pooja & Religious": 2.0, "default": 1.2,
+        },
+    },
+    {
+        "name": "Chhath Puja",
+        "dates": {2024: "2024-11-07", 2025: "2025-10-27", 2026: "2026-11-14", 2027: "2027-11-04"},
+        "window_before": 5,
+        "window_after": 1,
+        "category_multipliers": {
+            "Fruits & Vegetables": 1.7, "Grains & Pulses": 1.5, "Pooja & Religious": 1.8, "Bakery": 1.4, "default": DEFAULT_MULTIPLIER,
         },
     },
     {
@@ -134,8 +207,8 @@ FESTIVALS: List[Dict] = [
         "window_before": 8,
         "window_after": 1,
         "category_multipliers": {
-            "Bakery": 1.75, "Electronics": 1.45, "Clothing": 1.35, "Snacks": 1.4,
-            "Beverages": 1.3, "Books": 1.25, "default": 1.15,
+            "Bakery": 1.85, "Electronics": 1.5, "Clothing": 1.4, "Snacks": 1.45,
+            "Beverages": 1.4, "Chocolates & Confectionery": 1.8, "default": 1.15,
         },
     },
     {
@@ -144,7 +217,16 @@ FESTIVALS: List[Dict] = [
         "window_before": 4,
         "window_after": 0,
         "category_multipliers": {
-            "Beverages": 1.6, "Snacks": 1.45, "Bakery": 1.4, "Clothing": 1.2, "default": DEFAULT_MULTIPLIER,
+            "Beverages": 1.75, "Snacks": 1.55, "Bakery": 1.45, "Clothing": 1.25, "Personal Care": 1.2, "default": DEFAULT_MULTIPLIER,
+        },
+    },
+    {
+        "name": "Pongal",
+        "dates": {2024: "2024-01-15", 2025: "2025-01-14", 2026: "2026-01-15", 2027: "2027-01-15"},
+        "window_before": 5,
+        "window_after": 1,
+        "category_multipliers": {
+            "Grains & Pulses": 1.65, "Fruits & Vegetables": 1.4, "Dairy": 1.5, "Clothing": 1.35, "default": DEFAULT_MULTIPLIER,
         },
     },
 ]

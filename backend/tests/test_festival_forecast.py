@@ -62,3 +62,21 @@ def test_festival_item_demand(client):
     assert top_item["festival_period_sales"] >= top_item["baseline_period_sales"]
     assert top_item["festival_multiplier"] >= 1.0
 
+
+def test_festival_item_demand_varies_per_festival(client):
+    res_diwali = client.get("/api/forecast/festivals/item-demand?festival_name=Diwali").json()["data"]
+    res_holi = client.get("/api/forecast/festivals/item-demand?festival_name=Holi").json()["data"]
+    res_eid = client.get("/api/forecast/festivals/item-demand?festival_name=Eid%20al-Fitr").json()["data"]
+    res_christmas = client.get("/api/forecast/festivals/item-demand?festival_name=Christmas").json()["data"]
+
+    diwali_top_product = res_diwali["items"][0]["product_name"]
+    holi_top_product = res_holi["items"][0]["product_name"]
+    eid_top_product = res_eid["items"][0]["product_name"]
+    christmas_top_product = res_christmas["items"][0]["product_name"]
+
+    # Products should vary according to different festivals
+    assert diwali_top_product != holi_top_product
+    assert holi_top_product != eid_top_product
+    assert eid_top_product != christmas_top_product
+
+
