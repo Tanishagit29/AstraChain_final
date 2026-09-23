@@ -221,3 +221,14 @@ class Report(BaseModel):
     type = Column(String(100), nullable=False)
     author = Column(String(255), nullable=False)
     size = Column(String(50), default="1.0 MB")
+
+
+class ConversationHistory(BaseModel):
+    __tablename__ = "conversation_history"
+
+    session_id = Column(String(100), index=True, nullable=False, default="default-session")
+    role = Column(String(50), nullable=False)  # user, assistant, tool, system
+    content = Column(Text, nullable=True)
+    tool_calls = Column(JSON, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+

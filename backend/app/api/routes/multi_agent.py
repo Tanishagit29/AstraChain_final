@@ -9,6 +9,7 @@ from app.models.all_models import User, Notification, AutomationLog, Inventory, 
 from app.agents.forecast_agent import ForecastAgent
 from app.agents.inventory_agent import InventoryAgent
 from app.agents.wastage_agent import WastageAgent
+from app.agents.orchestrator_agent import OrchestratorAgent
 from app.services.forecast_service import ForecastService
 from app.services.inventory_service import InventoryService
 from app.services.wastage_service import WastageService
@@ -22,6 +23,33 @@ class KeyActionRequest(BaseModel):
     details: Optional[str] = None
 
 
+class OrchestrateTaskRequest(BaseModel):
+    task: str
+
+
+@router.post("/orchestrate")
+def orchestrate_multi_agent_task(
+    payload: OrchestrateTaskRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Autonomous Multi-Agent Orchestration endpoint.
+    Given a natural language task (e.g., 'Diwali is in 10 days, prep the Mumbai warehouse'),
+    the OrchestratorAgent dynamically determines which sub-agents to invoke, in what order,
+    and skips non-relevant agents based on autonomous reasoning.
+    """
+    orchestrator = OrchestratorAgent()
+    result = orchestrator.run(task=payload.task, context={"db": db})
+    return {
+        "status": "SUCCESS",
+        "task": payload.task,
+        "summary": result.get("final_content"),
+        "tools_executed": result.get("tools_executed"),
+        "reasoning_steps": result.get("reasoning_steps"),
+        "steps_taken": result.get("steps"),
+    }
+
+
 @router.post("/run")
 def run_multi_agent_pipeline(
     product_id: Optional[str] = "MK-001-F",
@@ -29,24 +57,18 @@ def run_multi_agent_pipeline(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """
-    Executes the Multi-Agent Intelligence Layer pipeline sequentially:
-    1. Demand & Forecasting Agent (XGBoost algorithm)
-    2. Inventory Agent (Optimal stock levels & Stockout/Overstock guard)
-    3. Automation & Wastage Agent (Near-expiry discount alerts & automated actions)
+    Executes the Multi-Agent Intelligence Layer pipeline.
+    Utilizes OrchestratorAgent or runs sub-agents sequentially for backward compatibility.
     """
-    # 1. Run Demand & Forecasting Agent (XGBoost)
     demand_agent = ForecastAgent()
     demand_res = demand_agent.execute(db, product_id=product_id, horizon_days=horizon_days)
 
-    # 2. Run Inventory Agent (Consumes forecast + inventory)
     inventory_agent = InventoryAgent()
     inventory_res = inventory_agent.execute(db)
 
-    # 3. Run Automation & Wastage Agent (Consumes shelf life & expiry)
     wastage_agent = WastageAgent()
     wastage_res = wastage_agent.execute(db)
 
-    # Discount range actually recommended by the Wastage Agent across all alerts (e.g. "10%-50%")
     lo, hi = wastage_res.get("discount_pct_min", 0), wastage_res.get("discount_pct_max", 0)
     if hi and lo != hi:
         discount_range = f"{lo}%-{hi}%"
@@ -55,7 +77,6 @@ def run_multi_agent_pipeline(
     else:
         discount_range = "10%-50%"
 
-    # 4. Synthesize Key Actions (Manager Approval, Supplier Notification, Discount Suggestion)
     key_actions = [
         {
             "id": "ACT-001",
@@ -104,7 +125,7 @@ def get_multi_agent_insights(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """
-    Returns real-time aggregated insights from all three agents for the Output & Visualization Dashboard.
+    Returns real-time aggregated insights from all agents for the Dashboard.
     """
     forecast_data = ForecastService.get_product_forecast(db, "MK-001-F", horizon_days=30)
     reorder_recs = InventoryService.get_reorder_recommendations(db)

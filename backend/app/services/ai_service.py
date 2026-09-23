@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
-from app.models.all_models import AgentActivity, Inventory, Supplier, Wastage, Route, Product
+from app.models.all_models import AgentActivity, Inventory, Supplier, Wastage, Route, Product, ConversationHistory
 from app.schemas.ai import AIChatRequest, AIChatResponse, AIRecommendationOut, AIAgentOut
 from app.ai.provider import AIServiceFactory
 
@@ -9,8 +9,18 @@ class AIService:
     @staticmethod
     def process_chat(db: Session, req: AIChatRequest) -> AIChatResponse:
         user_msg = req.message
+        session_id = req.session_id or "default-session"
 
-        # Gather database context for the AI engine
+        # Load session history turns (last 10 turns)
+        past_turns = (
+            db.query(ConversationHistory)
+            .filter(ConversationHistory.session_id == session_id)
+            .order_by(ConversationHistory.timestamp.asc())
+            .all()
+        )
+        history_dicts = [{"role": t.role, "content": t.content} for t in past_turns[-10:]]
+
+        # Gather database context
         high_risk = db.query(Inventory).filter(Inventory.risk == "HIGH").all()
         poor_suppliers = db.query(Supplier).filter(Supplier.risk_level != "LOW").all()
         expiring = db.query(Wastage).filter(Wastage.severity != "LOW").all()
@@ -25,10 +35,22 @@ class AIService:
             "total_skus": total_skus
         }
 
-        provider = AIServiceFactory.get_provider()
-        reply_text = provider.generate_response(user_msg, context_data)
+        # Persist user message to conversation_history
+        user_entry = ConversationHistory(session_id=session_id, role="user", content=user_msg)
+        db.add(user_entry)
+        db.commit()
 
-        # Dynamic suggested actions
+        # Generate response from AI provider with tool details
+        provider = AIServiceFactory.get_provider()
+        res_details = provider.generate_response_details(user_msg, context_data, session_history=history_dicts, db=db)
+        reply_text = res_details.get("reply", "")
+
+        # Persist assistant response to conversation_history
+        assistant_entry = ConversationHistory(session_id=session_id, role="assistant", content=reply_text)
+        db.add(assistant_entry)
+        db.commit()
+
+        # Dynamic suggested actions based on query intent
         suggested = ["Run demand forecast simulation", "Audit perishable wastage risk"]
         msg_lower = user_msg.lower()
         if "reorder" in msg_lower or "stockout" in msg_lower or "milk" in msg_lower:
@@ -42,7 +64,9 @@ class AIService:
             reply=reply_text,
             agent_id="AG-06",
             agent_name="Copilot Assistant Agent",
-            suggested_actions=suggested
+            suggested_actions=suggested,
+            tools_executed=res_details.get("tools_executed"),
+            reasoning_steps=res_details.get("reasoning_steps")
         )
 
     @staticmethod

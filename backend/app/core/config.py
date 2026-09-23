@@ -29,6 +29,9 @@ class Settings(BaseSettings):
 
     LOG_LEVEL: str = "INFO"
 
+    GROQ_API_KEY: Union[str, None] = None
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,

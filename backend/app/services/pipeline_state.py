@@ -319,5 +319,5 @@ class PipelineState:
 
 # Module-level singleton instance
 pipeline_state = PipelineState()
-pipeline_state.load_default_near_expiry_items()
+
 

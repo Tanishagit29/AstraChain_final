@@ -5,8 +5,9 @@ from app.database.session import engine
 from app.core.security import get_password_hash
 from app.models.all_models import (
     User, Category, Product, Inventory, Forecast,
-    Supplier, Route, Wastage, AutomationLog, AgentActivity, Report
+    Supplier, Route, Wastage, AutomationLog, AgentActivity, Report, ConversationHistory
 )
+
 
 def init_db(db: Session) -> None:
     # Create tables
