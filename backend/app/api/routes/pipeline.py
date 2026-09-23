@@ -33,20 +33,11 @@ def get_pipeline_dashboard(db: Session = Depends(get_db)) -> Dict[str, Any]:
     Falls back to DB-driven dashboard if pipeline hasn't run.
     """
     if not pipeline_state.has_run:
-        # Fall back to DB-driven dashboard
-        try:
-            summary = DashboardService.get_dashboard_summary(db)
-            return {
-                "has_data": False,
-                "message": "No pipeline has been executed yet. Upload a dataset from the Data Ingestion page.",
-                "kpiMetrics": summary.kpiMetrics,
-                "demandForecastData": summary.demandForecastData,
-                "aiRecommendations": summary.aiRecommendations,
-                "recentActivityLogs": summary.recentActivityLogs,
-                "healthIndicators": summary.healthIndicators,
-            }
-        except Exception:
-            return {"has_data": False, "message": "No data available. Upload a dataset to begin."}
+        return {
+            "has_data": False,
+            "message": "No pipeline has been executed yet. Upload a dataset from the Data Ingestion page."
+        }
+
 
     # Build dashboard from pipeline state
     ds = pipeline_state.dataset_summary
