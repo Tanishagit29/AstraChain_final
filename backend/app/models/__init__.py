@@ -1,0 +1,21 @@
+from app.models.all_models import (
+    User,
+    Category,
+    Product,
+    Inventory,
+    SalesHistory,
+    Forecast,
+    Supplier,
+    SupplierPerformance,
+    Warehouse,
+    Route,
+    Delivery,
+    Wastage,
+    Notification,
+    AutomationLog,
+    AgentActivity,
+    Report,
+    AgentMessageBoard,
+    DecisionMemory,
+)
+

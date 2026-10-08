@@ -1,0 +1,7 @@
+product_id,product_name,category,current_stock,demand,unit_cost,warehouse,expiry_date
+SKU-EXP,Expired Yogurt,Dairy,50,100,₹40,Mumbai Central,2026-10-04
+SKU-URGENT,Urgent Milk,Dairy,100,120,₹60,Mumbai Central,2026-10-08
+SKU-MED,Medium Cheese,Dairy,150,150,₹150,Pune North,2026-10-11
+SKU-LOW,Low Bread,Bakery,200,200,₹45,Thane East,2026-10-13
+SKU-NORMAL,Fresh Rice,Grains,500,400,₹80,Mumbai Central,2026-11-06
+SKU-NOEXP,Salt (No Expiry),Staples,1000,500,₹20,Pune North,

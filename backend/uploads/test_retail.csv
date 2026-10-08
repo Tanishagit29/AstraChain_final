@@ -1,0 +1,4 @@
+product_id,product_name,category,current_stock,demand,unit_cost,warehouse,expiry_date
+SKU-MILK-01,Organic Fresh Milk,Dairy,150,500,₹65,Mumbai Central,2026-08-30
+SKU-RICE-02,Basmati Rice 5kg,Staples,800,300,₹420,Pune North,2027-01-15
+SKU-APPLE-03,Kashmir Apples 1kg,Produce,50,200,₹180,Thane East,2026-08-28

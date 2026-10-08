@@ -1,0 +1,5 @@
+product_id,product_name,category,current_stock,demand,unit_cost,warehouse,expiry_date
+SKU-OCT-01,October Milk,Dairy,100,200,₹70,Mumbai Central,01/10/2026
+SKU-SEP-01,September Cheese,Dairy,150,180,₹140,Pune North,01/09/2026
+SKU-JAN-10,January Bread (Expired),Bakery,80,100,₹40,Thane East,10/01/2026
+SKU-OCT-15,Mid October Paneer,Dairy,200,250,₹160,Mumbai Central,15/10/2026

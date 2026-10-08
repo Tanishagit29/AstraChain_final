@@ -1,0 +1,13 @@
+store_id,store_name,product_code,product_name,sub_cat_name,unit_cost,mrp,avg_daily_demand_units,expected_next_festival_multiplier,lead_time_days,current_stock,reorder_point_units,safety_stock_units,max_stock_units,days_of_cover,is_perishable,perishable_tier,days_to_nearest_expiry,wastage_flag,nearest_batch_id,nearest_batch_quantity,stockout_risk
+ST01,Rio Mart Test,1,ITEM 1,TEST,80.0,100.0,1.2,1.0,4,0,7,2,16,100.0,False,LOW,,NOT_TRACKED,,,STOCKOUT
+ST01,Rio Mart Test,2,ITEM 2,TEST,80.0,100.0,1.2,1.0,4,1,7,2,16,100.0,False,LOW,,NOT_TRACKED,,,CRITICAL
+ST01,Rio Mart Test,3,ITEM 3,TEST,80.0,100.0,1.2,1.0,4,5,7,2,16,100.0,False,LOW,,NOT_TRACKED,,,AT_RISK
+ST01,Rio Mart Test,4,ITEM 4,TEST,80.0,100.0,1.2,1.0,4,12,7,2,16,200.0,False,LOW,,NOT_TRACKED,,,HEALTHY
+ST01,Rio Mart Test,5,ITEM 5,TEST,80.0,100.0,1.2,1.0,4,16,7,2,16,150.0,False,LOW,,NOT_TRACKED,,,HEALTHY
+ST01,Rio Mart Test,6,ITEM 6,TEST,80.0,100.0,1.2,1.0,4,16,7,2,16,20.0,False,LOW,,NOT_TRACKED,,,HEALTHY
+ST01,Rio Mart Test,7,ITEM 7,TEST,80.0,100.0,1.2,1.0,4,10,7,2,16,100.0,True,MEDIUM,1.0,NEAR_EXPIRY,7-ST01-1,20.0,HEALTHY
+ST01,Rio Mart Test,8,ITEM 8,TEST,80.0,100.0,1.2,1.0,4,10,7,2,16,100.0,True,MEDIUM,4.0,NEAR_EXPIRY,8-ST01-1,20.0,HEALTHY
+ST01,Rio Mart Test,9,ITEM 9,TEST,80.0,100.0,1.2,1.0,4,10,7,2,16,100.0,True,MEDIUM,6.0,NEAR_EXPIRY,9-ST01-1,20.0,HEALTHY
+ST01,Rio Mart Test,10,ITEM 10,TEST,80.0,100.0,1.2,1.0,4,10,7,2,16,100.0,True,MEDIUM,9.0,NEAR_EXPIRY,10-ST01-1,20.0,HEALTHY
+ST01,Rio Mart Test,11,ITEM 11,TEST,80.0,100.0,1.2,1.0,4,10,7,2,16,100.0,True,MEDIUM,30.0,OK,11-ST01-1,20.0,HEALTHY
+ST01,Rio Mart Test,12,ITEM 12,TEST,80.0,100.0,1.2,1.0,4,0,7,2,16,100.0,True,MEDIUM,1.0,NEAR_EXPIRY,12-ST01-1,20.0,STOCKOUT
