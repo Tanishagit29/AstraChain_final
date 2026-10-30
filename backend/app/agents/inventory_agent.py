@@ -15,7 +15,7 @@ class InventoryAgent(BaseSupplyChainAgent):
 
     def __init__(self):
         system_prompt = (
-            "You are TransitOps Inventory Agent (AG-02).\n"
+            "You are AstraChain Inventory Agent (AG-02).\n"
             "Your responsibility is to optimize warehouse stock levels, prevent stockout crises, and guard against overstock.\n\n"
             "INSTRUCTIONS:\n"
             "1. Invoke `evaluate_inventory_risk` to scan SKUs across warehouses and compare stock with XGBoost forecast demand.\n"

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.models.all_models import AgentActivity, Inventory, Supplier, Wastage, Route, Product, ConversationHistory
 from app.schemas.ai import AIChatRequest, AIChatResponse, AIRecommendationOut, AIAgentOut
 from app.ai.provider import AIServiceFactory
+from app.services.pipeline_state import pipeline_state
 
 
 class AIService:
@@ -34,6 +35,19 @@ class AIService:
             "routes": [{"truckId": r.truck_id, "driver": r.driver, "origin": r.origin, "destination": r.destination, "status": r.status, "eta": r.eta, "temp": r.temp} for r in routes],
             "total_skus": total_skus
         }
+
+        if pipeline_state.has_run:
+            inv = pipeline_state.inventory_summary or {}
+            wst = pipeline_state.wastage_summary or {}
+            ds = pipeline_state.dataset_summary or {}
+            context_data["pipeline"] = {
+                "total_rows": ds.get("total_rows", 0),
+                "total_products": ds.get("total_products", 0),
+                "stockout_count": inv.get("stockout_count", 0),
+                "overstock_count": inv.get("overstock_count", 0),
+                "near_expiry_count": wst.get("near_expiry_count", 0),
+                "expired_count": wst.get("expired_count", 0),
+            }
 
         # Persist user message to conversation_history
         user_entry = ConversationHistory(session_id=session_id, role="user", content=user_msg)

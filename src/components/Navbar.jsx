@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { Search, Bell, Radio, HelpCircle } from 'lucide-react';
+import { Search, Radio, HelpCircle, Smartphone } from 'lucide-react';
+import NotificationDropdown from './NotificationDropdown';
+import ThemeToggle from './ThemeToggle';
+import PhoneIntegrationModal from './PhoneIntegrationModal';
 
 export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
 
   return (
     <header className="flex justify-between items-center h-16 px-lg sticky top-0 z-50 bg-surface/80 backdrop-blur-xl border-b border-outline-variant shadow-sm">
@@ -22,10 +26,21 @@ export default function Navbar() {
 
       {/* Right Controls & Profile */}
       <div className="flex items-center gap-md">
-        <button className="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high rounded-full transition-all relative">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full animate-pulse" />
+        {/* Phone & Mobile Alerts Integration Button */}
+        <button
+          onClick={() => setShowPhoneModal(true)}
+          className="h-9 px-3 rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 transition-all flex items-center gap-1.5 text-[12px] font-bold cursor-pointer shadow-sm hover:shadow-primary/20"
+          title="Connect Phone for Real-Time Lock Screen Notifications"
+        >
+          <Smartphone className="w-4 h-4" />
+          <span className="hidden sm:inline">Phone Alerts</span>
         </button>
+
+        {/* Manager Notification Center with 1-Click Restock */}
+        <NotificationDropdown />
+
+        {/* Dark/Light Mode Theme Toggle (Symbol Only) */}
+        <ThemeToggle showLabel={false} />
 
         <button className="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high rounded-full transition-all">
           <Radio className="w-5 h-5 text-primary" />
@@ -49,6 +64,9 @@ export default function Navbar() {
           />
         </div>
       </div>
+
+      {/* Phone & Mobile Integration Modal */}
+      <PhoneIntegrationModal isOpen={showPhoneModal} onClose={() => setShowPhoneModal(false)} />
     </header>
   );
 }

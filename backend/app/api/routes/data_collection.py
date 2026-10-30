@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
@@ -19,6 +20,7 @@ from app.schemas.forecast import GenerateForecastRequest
 from app.agents.forecast_agent import ForecastAgent
 from app.agents.inventory_agent import InventoryAgent
 from app.agents.wastage_agent import WastageAgent
+from app.services.agent_insights import launch_agent_insights
 from datetime import timedelta
 
 try:
@@ -185,17 +187,10 @@ def robust_parse_date(val: Any) -> Optional[datetime]:
     return None
 
 def robust_parse_date_series(series: pd.Series) -> pd.Series:
-    """Vectorized robust date parsing for a pandas Series."""
+    """Vectorized robust date parsing for a pandas Series using robust_parse_date."""
     if series.empty:
         return series
-    # Try pandas vectorized parsing with dayfirst=True for DD/MM/YYYY formats
-    parsed = pd.to_datetime(series, errors='coerce', dayfirst=True)
-    unparsed_mask = parsed.isna() & series.notna()
-    if unparsed_mask.any():
-        fallback_parsed = series[unparsed_mask].apply(robust_parse_date)
-        fallback_dt = pd.to_datetime(fallback_parsed, errors='coerce', dayfirst=True)
-        parsed.loc[unparsed_mask] = fallback_dt
-    return parsed
+    return pd.Series([robust_parse_date(x) for x in series], index=series.index)
 
 def auto_detect_type(series: pd.Series, col_name: str = "") -> str:
     """Auto-detect datatype of a pandas Series with column name hints."""
@@ -1138,7 +1133,7 @@ def auto_inject_and_sync(df: pd.DataFrame, db: Session):
                     reason=f"Near-expiry threshold: expires in {diff_days} day(s) ({exp_d.strftime('%Y-%m-%d')})",
                     loss_amount=f"₹{loss_val:,}",
                     severity="HIGH" if diff_days <= 2 else "MEDIUM",
-                    agent_intervention=f"Automated {disc}% promo discount alert triggered to accelerate clearance."
+                    agent_intervention=f"Recommended {disc}% promo discount to accelerate clearance."
                 ))
 
         daily_base = max(10, forecast_val // 30)
@@ -1217,14 +1212,23 @@ def sync_cleaned_data_to_forecast(db: Session):
         except Exception as ex:
             logger.warning(f"XGBoost forecast generation failed: {ex}")
 
-    # Synchronize Multi-Agents
-    try:
-        first_sku = products[0].sku if products else "MK-001-F"
-        ForecastAgent().execute(db, product_id=first_sku)
-        InventoryAgent().execute(db)
-        WastageAgent().execute(db)
-    except Exception as e:
-        logger.warning(f"Multi-agent synchronization after data collection inject: {e}")
+    # Synchronize Multi-Agents.
+    # Deterministic mode on purpose: this runs inside the upload request, and a Groq call here (slow, rate limited,
+    # or down) used to freeze the whole API so the pipeline never returned. The LLM agents run afterwards in the
+    # background via launch_agent_insights().
+    first_sku = products[0].sku if products else "MK-001-F"
+    sync_steps = [
+        ("Forecast", ForecastAgent(), lambda a: a.execute(db, product_id=first_sku)),
+        ("Inventory", InventoryAgent(), lambda a: a.execute(db)),
+        ("Wastage", WastageAgent(), lambda a: a.execute(db)),
+    ]
+    for label, agent, call in sync_steps:
+        agent.use_llm = False
+        try:
+            call(agent)
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"{label} agent synchronization after data collection inject failed: {e}")
 
 
 @router.post("/inject")
@@ -1441,7 +1445,7 @@ async def run_full_pipeline(
 ):
     """
     UNIFIED AUTOMATIC PIPELINE ENDPOINT.
-    
+
     Executes the complete pipeline in one call:
     1. Parse & extract uploaded files (CSV/Excel/PDF)
     2. Auto-clean the data (imputation, dedup, standardization)
@@ -1451,21 +1455,30 @@ async def run_full_pipeline(
     6. Run Inventory Analysis
     7. Run Automation & Wastage Agent
     8. Update shared pipeline state for all pages
+    9. Start the Groq LLM agents in the background (optional; never blocks the results)
 
     The user only needs to upload their file — everything else is automatic.
+
+    The heavy pandas/XGBoost work runs in a worker thread so the API stays responsive
+    (status polling and every other page keep working while a large dataset is processed).
     """
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded.")
 
+    payloads = [((f.filename or "upload"), await f.read()) for f in files]
+    return await run_in_threadpool(_execute_full_pipeline, payloads, db)
+
+
+def _execute_full_pipeline(payloads: List[tuple], db: Session):
+    """Synchronous pipeline body. `payloads` is a list of (filename, raw_bytes)."""
     pipeline_state.start_pipeline()
     pipeline_state.update_stage("upload", "running")
 
     # ========== STEP 1: PARSE FILES ==========
     extracted_dfs: List[pd.DataFrame] = []
 
-    for file in files:
-        filename = file.filename.lower()
-        file_bytes = await file.read()
+    for original_name, file_bytes in payloads:
+        filename = original_name.lower()
 
         try:
             if filename.endswith(".csv"):
@@ -1481,15 +1494,15 @@ async def run_full_pipeline(
                 else:
                     raise Exception("No tables detected in PDF.")
             else:
-                raise HTTPException(status_code=400, detail=f"Unsupported file format: {file.filename}")
+                raise HTTPException(status_code=400, detail=f"Unsupported file format: {original_name}")
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Failed parsing file '{file.filename}': {e}")
+            logger.error(f"Failed parsing file '{original_name}': {e}")
             pipeline_state.update_stage("upload", "error")
             return JSONResponse(
                 status_code=400,
-                content={"error": f"Failed parsing '{file.filename}': {str(e)}", "stages": pipeline_state.stages}
+                content={"error": f"Failed parsing '{original_name}': {str(e)}", "stages": pipeline_state.stages}
             )
 
     if not extracted_dfs:
@@ -1840,6 +1853,12 @@ async def run_full_pipeline(
             engineered_columns=engineered_cols,
         )
 
+        # Optional: Groq agents reason over the finished results in the background (results above are already live)
+        try:
+            launch_agent_insights(first_sku=products[0].sku if products else None)
+        except Exception as insight_err:
+            logger.warning(f"Could not start LLM agent insights: {insight_err}")
+
         # Return complete pipeline results
         return {
             "status": "success",
@@ -1859,9 +1878,14 @@ async def run_full_pipeline(
             "inventory_summary": pipeline_state.inventory_summary,
             "wastage_summary": pipeline_state.wastage_summary,
             "missing_field_warnings": pipeline_state.missing_field_warnings,
+            "agent_insights": pipeline_state.agent_insights,
         }
     except Exception as pipeline_err:
-        logger.error(f"Error executing full dataset pipeline: {pipeline_err}")
+        logger.error(f"Error executing full dataset pipeline: {pipeline_err}", exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass
         for stage_k, stage_v in list(pipeline_state.stages.items()):
             if stage_v == "running":
                 pipeline_state.update_stage(stage_k, "error")

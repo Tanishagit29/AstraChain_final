@@ -18,22 +18,22 @@ from app.models.all_models import (
 def seed_database():
     db = SessionLocal()
     try:
-        print("Starting TransitOps Idempotent Database Seeding...")
+        print("Starting AstraChain Idempotent Database Seeding...")
 
         # 1. Users
-        if not db.query(User).filter(User.email == "operator@transitops.ai").first():
+        if not db.query(User).filter(User.email == "operator@astrachain.ai").first():
             db.add(User(
-                email="operator@transitops.ai",
-                hashed_password=get_password_hash("TransitOps2026!"),
+                email="operator@astrachain.ai",
+                hashed_password=get_password_hash("AstraChain2026!"),
                 full_name="Daksh Mehta",
                 role="CHIEF_OPERATIONS_OFFICER",
                 is_active=True
             ))
 
-        if not db.query(User).filter(User.email == "admin@transitops.ai").first():
+        if not db.query(User).filter(User.email == "admin@astrachain.ai").first():
             db.add(User(
-                email="admin@transitops.ai",
-                hashed_password=get_password_hash("AdminTransit2026!"),
+                email="admin@astrachain.ai",
+                hashed_password=get_password_hash("AdminAstra2026!"),
                 full_name="System Administrator",
                 role="ADMIN",
                 is_active=True

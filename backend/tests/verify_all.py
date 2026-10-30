@@ -30,7 +30,7 @@ def test_endpoint(client, method, path, json_body=None, headers=None):
 
 def run_verification():
     print("=" * 70)
-    print("TRANSITOPS BACKEND COMPREHENSIVE VERIFICATION AUDIT")
+    print("ASTRACHAIN BACKEND COMPREHENSIVE VERIFICATION AUDIT")
     print("=" * 70)
     
     results = []
@@ -51,7 +51,7 @@ def run_verification():
         results.append(("2. CORS Preflight (http://localhost:5173)", cors_ok, f"Access-Control-Allow-Origin: {res_cors.headers.get('access-control-allow-origin')}"))
 
         # 3. JWT Auth Flow Verification
-        test_email = "verifier_test@transitops.ai"
+        test_email = "verifier_test@astrachain.ai"
         test_pwd = "VerificationPassword2026!"
 
         # Register

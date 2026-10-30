@@ -14,15 +14,20 @@ from app.api.routes import api_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Initializing TransitOps Backend Application...")
+    logger.info("Initializing AstraChain Backend Application...")
     db = SessionLocal()
     try:
         init_db(db)
         logger.info("Database schemas initialized and seed data verified.")
+        try:
+            from app.services.pipeline_state import pipeline_state
+            pipeline_state.load_default_near_expiry_items()
+        except Exception as e:
+            logger.warning(f"Could not load initial pipeline data: {e}")
     finally:
         db.close()
     yield
-    logger.info("Shutting down TransitOps Backend Application.")
+    logger.info("Shutting down AstraChain Backend Application.")
 
 
 app = FastAPI(

@@ -1,4 +1,5 @@
 from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.database.session import get_db
@@ -72,6 +73,26 @@ def get_reorder_recommendations(db: Session = Depends(get_db)):
         message="Reorder recommendations generated successfully.",
         data=recommendations
     )
+
+
+class RestockInventoryPayload(BaseModel):
+    product_id: str
+    quantity: Optional[int] = 500
+
+
+@router.post("/restock", response_model=APIResponse[dict])
+def restock_inventory(payload: RestockInventoryPayload, db: Session = Depends(get_db)):
+    from app.services.pipeline_state import pipeline_state
+    qty = payload.quantity or 500
+    pipe_item = pipeline_state.restock_item(payload.product_id, qty)
+    db_item = InventoryService.restock_item(db, payload.product_id, qty)
+    pname = (pipe_item.get("product_name") if pipe_item else (db_item.name if db_item else payload.product_id))
+    return APIResponse(
+        success=True,
+        message=f"Successfully restocked {pname} (+{qty:,} units).",
+        data={"product_id": payload.product_id, "product_name": pname, "quantity": qty}
+    )
+
 
 
 @router.get("/{product_code}", response_model=APIResponse[InventoryItemOut])

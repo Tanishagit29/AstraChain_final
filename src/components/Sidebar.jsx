@@ -34,7 +34,7 @@ export default function Sidebar() {
               </span>
             </div>
             <div>
-              <h1 className="text-title-md font-bold text-primary leading-tight tracking-tight">TransitOps</h1>
+              <h1 className="text-title-md font-bold text-primary leading-tight tracking-tight">AstraChain</h1>
               <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">Autonomous Pipeline</p>
             </div>
           </div>
@@ -65,11 +65,11 @@ export default function Sidebar() {
 
         {/* Bottom Utility Links */}
         <div className="mt-auto px-md space-y-xs pt-lg border-t border-outline-variant/30">
-          <button className="w-full flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50 transition-colors rounded-lg text-left">
+          <button className="w-full flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50 transition-colors rounded-lg text-left cursor-pointer">
             <Settings className="w-5 h-5" />
             <span className="font-label-md text-label-md">Settings</span>
           </button>
-          <button className="w-full flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50 transition-colors rounded-lg text-left">
+          <button className="w-full flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50 transition-colors rounded-lg text-left cursor-pointer">
             <User className="w-5 h-5" />
             <span className="font-label-md text-label-md">Profile</span>
           </button>

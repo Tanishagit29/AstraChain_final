@@ -26,6 +26,20 @@ def get_pipeline_status() -> Dict[str, Any]:
     return pipeline_state.get_full_status()
 
 
+@router.get("/agents")
+def get_pipeline_agent_insights() -> Dict[str, Any]:
+    """
+    Returns the Groq LLM agents' reasoning about the latest pipeline run.
+    These run in the background after the pipeline completes, so poll until status is
+    completed / skipped / error. The pipeline results themselves never depend on this.
+    """
+    return {
+        "has_run": pipeline_state.has_run,
+        "dataset_id": pipeline_state.dataset_id,
+        **pipeline_state.agent_insights,
+    }
+
+
 @router.get("/dashboard")
 def get_pipeline_dashboard(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """
@@ -104,10 +118,11 @@ def get_pipeline_dashboard(db: Session = Depends(get_db)) -> Dict[str, Any]:
             ai_recommendations.append({
                 "id": f"REC-{rec_idx:02d}",
                 "type": "HIGH_RISK",
+                "product_id": item.get("product_id"),
                 "product": item.get("product_name", "Unknown"),
                 "riskText": f"Stockout Risk: {item.get('current_stock', 0)} in stock vs {item.get('predicted_demand', 0)} predicted demand",
-                "actionText": f"Reorder {item.get('suggested_reorder_qty') or max(100, item.get('predicted_demand', 0) - item.get('current_stock', 0))} units",
-                "actionClass": "bg-error-container text-on-error-container"
+                "actionText": f"1-Click Restock (+{item.get('suggested_reorder_qty') or 500} units)",
+                "actionClass": "bg-primary text-on-primary hover:opacity-90 font-bold cursor-pointer"
             })
             rec_idx += 1
 

@@ -57,6 +57,13 @@ class MultiStopOptimizationResponse(BaseModel):
     naive_fuel_cost_inr: float
     fuel_saved_inr: float
     savings_pct: float
+    fuel_saved_liters: float = 0.0
+    co2_abated_kg: float = 0.0
+    fuel_efficiency_kmpl: float = 5.2
+    diesel_price_per_liter: float = 92.5
+    traffic_delay_mitigated_minutes: int = 18
+    toll_count: int = 2
+    toll_cost_inr: float = 380.0
 
 
 class KnownLocationsOut(BaseModel):

@@ -83,5 +83,13 @@ def test_user_requested_dates_in_pipeline():
     assert oct15_item["expiry_date"] == "2026-10-15"
     expected_oct15_days = (datetime.strptime("2026-10-15", "%Y-%m-%d").date() - datetime.now(timezone.utc).date()).days
     assert oct15_item["days_remaining"] == expected_oct15_days
-    assert oct15_item["decision"] == "Sell Normally"
-    assert oct15_item["discount"] == "None"
+    # The decision depends on how far "today" is from the expiry date (the original assertion hard-coded
+    # a late-August "today" and started failing once the calendar moved on).
+    if expected_oct15_days < 0:
+        assert oct15_item["decision"] == "Do Not Sell"
+    elif expected_oct15_days <= 7:
+        assert oct15_item["decision"] == "Apply Discount"
+        assert oct15_item["discount"] != "None"
+    else:
+        assert oct15_item["decision"] == "Sell Normally"
+        assert oct15_item["discount"] == "None"

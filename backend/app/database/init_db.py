@@ -23,10 +23,10 @@ def init_db(db: Session) -> None:
         pass
 
     # Seed User
-    if not db.query(User).filter(User.email == "operator@transitops.ai").first():
+    if not db.query(User).filter(User.email == "operator@astrachain.ai").first():
         user = User(
-            email="operator@transitops.ai",
-            hashed_password=get_password_hash("TransitOps2026!"),
+            email="operator@astrachain.ai",
+            hashed_password=get_password_hash("AstraChain2026!"),
             full_name="Daksh Mehta",
             role="CHIEF_OPERATIONS_OFFICER",
             is_active=True

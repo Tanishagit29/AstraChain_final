@@ -5,7 +5,7 @@ import StatusBadge from '../components/StatusBadge';
 import { api } from '../api/client';
 import {
   Boxes, AlertTriangle, ShieldAlert, Archive, CheckCircle, UploadCloud, Database,
-  BarChart3, Search, Download
+  BarChart3, Search, Download, Zap, RotateCw, CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -17,6 +17,9 @@ export default function InventoryIntelligence() {
   const [loading, setLoading] = useState(true);
   const [filterRisk, setFilterRisk] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [restockingId, setRestockingId] = useState(null);
+  const [restockingAll, setRestockingAll] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -33,6 +36,101 @@ export default function InventoryIntelligence() {
 
   const summary = invData?.summary || {};
   const items = invData?.items || [];
+
+  const stockoutItems = useMemo(() => {
+    return items.filter((i) => i.status === 'Stockout Risk' || i.status === 'Low Stock');
+  }, [items]);
+
+  const handleRestockItem = async (item) => {
+    if (!item.product_id) return;
+    setRestockingId(item.product_id);
+    try {
+      const qty = item.suggested_reorder_qty || 500;
+      const res = await api.restockProduct({
+        product_id: item.product_id,
+        quantity: qty,
+      });
+
+      if (res && res.success) {
+        setToastMessage(`Restocked ${res.product_name || item.product_name} (+${qty.toLocaleString()} units)! Stockout risk resolved.`);
+        setTimeout(() => setToastMessage(null), 4000);
+
+        // Update local item in list
+        setInvData((prev) => {
+          if (!prev) return prev;
+          const updatedItems = prev.items.map((i) => {
+            if (i.product_id === item.product_id) {
+              const newStock = (i.current_stock || 0) + qty;
+              const ratio = roundRatio(newStock, i.predicted_demand);
+              return {
+                ...i,
+                current_stock: newStock,
+                stock_ratio: ratio,
+                status: ratio >= 0.7 ? 'Optimal Stock' : 'Low Stock',
+                recommended_action: ratio >= 0.7 ? 'Optimal level' : 'Minor reorder',
+                suggested_reorder_qty: 0,
+                is_restocked: true
+              };
+            }
+            return i;
+          });
+
+          const total = updatedItems.length;
+          const available = updatedItems.filter(i => i.status === 'Optimal Stock' || i.status === 'Healthy' || i.status === 'Available').length;
+          const low = updatedItems.filter(i => i.status === 'Low Stock').length;
+          const stockouts = updatedItems.filter(i => i.status === 'Stockout Risk').length;
+          const overstock = updatedItems.filter(i => i.status === 'Overstock').length;
+
+          return {
+            ...prev,
+            items: updatedItems,
+            summary: {
+              ...prev.summary,
+              available_count: available,
+              low_stock_count: low,
+              stockout_count: stockouts,
+              overstock_count: overstock,
+              healthy_pct: total > 0 ? Math.round((available / total) * 100) : 100,
+            }
+          };
+        });
+      }
+    } catch (err) {
+      console.error('Failed to restock item:', err);
+    } finally {
+      setRestockingId(null);
+    }
+  };
+
+  const handleRestockAll = async () => {
+    if (stockoutItems.length === 0) return;
+    setRestockingAll(true);
+    try {
+      for (const it of stockoutItems) {
+        await api.restockProduct({
+          product_id: it.product_id,
+          quantity: it.suggested_reorder_qty || 500,
+        });
+      }
+      setToastMessage(`All ${stockoutItems.length} critical stockouts successfully restocked!`);
+      setTimeout(() => setToastMessage(null), 5000);
+
+      // Refresh inventory data from backend
+      const refreshed = await api.getPipelineInventory();
+      if (refreshed) {
+        setInvData(refreshed);
+      }
+    } catch (err) {
+      console.error('Failed to restock all items:', err);
+    } finally {
+      setRestockingAll(false);
+    }
+  };
+
+  const roundRatio = (stock, demand) => {
+    const d = demand || 1;
+    return Math.round((stock / d) * 100) / 100;
+  };
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -136,6 +234,49 @@ export default function InventoryIntelligence() {
         title="Inventory Intelligence & Stock Risk Agent"
         subtitle="Stock levels vs XGBoost predicted demand for item names — detecting Stockout Risks and Overstock conditions in real time."
       />
+
+      {/* Success Notification Banner */}
+      {toastMessage && (
+        <div className="p-md rounded-xl bg-secondary/15 border border-secondary/30 text-secondary font-bold flex items-center gap-sm shadow-lg animate-fade-in">
+          <CheckCircle2 className="w-5 h-5 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Manager Stockout Alert & 1-Click Restock Banner */}
+      {stockoutItems.length > 0 && (
+        <div className="glass-card rounded-xl p-lg border border-error/40 bg-error/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-md shadow-lg shadow-error/5 animate-fade-in">
+          <div className="flex items-center gap-md">
+            <div className="w-12 h-12 rounded-xl bg-error/15 border border-error/30 flex items-center justify-center text-error shrink-0">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-xs flex-wrap">
+                <h4 className="font-bold text-on-surface text-title-md">
+                  Critical Stockout Alerts ({stockoutItems.length} SKUs At Risk)
+                </h4>
+                <span className="bg-error text-on-error font-mono text-[10px] px-2 py-0.5 rounded-full font-bold">
+                  Immediate Restock Required
+                </span>
+              </div>
+              <p className="text-on-surface-variant text-body-md mt-0.5">
+                Predicted demand exceeds inventory. Manager can authorize instant replenishment in a single click.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-sm flex-wrap shrink-0">
+            <button
+              onClick={handleRestockAll}
+              disabled={restockingAll}
+              className="bg-primary hover:bg-primary/90 text-on-primary font-bold px-lg py-sm rounded-lg text-label-md flex items-center gap-1.5 shadow-lg shadow-primary/25 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Zap className="w-4 h-4" />
+              <span>{restockingAll ? 'Restocking All Items...' : `1-Click Restock All (${stockoutItems.length})`}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-md">
@@ -399,16 +540,40 @@ export default function InventoryIntelligence() {
                       </td>
                       <td className="px-lg py-md text-on-surface-variant">{item.warehouse}</td>
                       <td className="px-lg py-md font-mono text-label-sm">
-                        {item.recommended_action ? (
-                          <span className={
-                            item.status === 'Stockout Risk' ? 'text-error font-bold' :
-                            item.status === 'Overstock' ? 'text-tertiary font-bold' :
-                            item.status === 'Low Stock' ? 'text-secondary font-bold' : 'text-on-surface-variant'
-                          }>
-                            {item.recommended_action.replace(/_/g, ' ')}
-                            {item.suggested_reorder_qty > 0 ? ` · ${item.suggested_reorder_qty.toLocaleString()} units` : ''}
-                          </span>
-                        ) : '—'}
+                        <div className="flex flex-col gap-1.5">
+                          {item.recommended_action && (
+                            <span className={
+                              item.status === 'Stockout Risk' ? 'text-error font-bold' :
+                              item.status === 'Overstock' ? 'text-tertiary font-bold' :
+                              item.status === 'Low Stock' ? 'text-secondary font-bold' : 'text-on-surface-variant'
+                            }>
+                              {item.recommended_action.replace(/_/g, ' ')}
+                              {item.suggested_reorder_qty > 0 ? ` · ${item.suggested_reorder_qty.toLocaleString()} units` : ''}
+                            </span>
+                          )}
+
+                          {(item.status === 'Stockout Risk' || item.status === 'Low Stock') && (
+                            <button
+                              onClick={() => handleRestockItem(item)}
+                              disabled={restockingId === item.product_id}
+                              className="bg-primary hover:bg-primary/90 text-on-primary font-bold px-2.5 py-1 rounded-md text-[11px] flex items-center gap-1 shadow-md shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer w-fit"
+                              title="Single-click instant replenishment"
+                            >
+                              {restockingId === item.product_id ? (
+                                <RotateCw className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Zap className="w-3 h-3" />
+                              )}
+                              <span>1-Click Restock</span>
+                            </button>
+                          )}
+
+                          {item.is_restocked && (
+                            <span className="text-secondary font-bold text-[11px] flex items-center gap-1 bg-secondary/15 px-2 py-0.5 rounded border border-secondary/30 w-fit">
+                              <CheckCircle2 className="w-3 h-3" /> Restocked
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))

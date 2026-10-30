@@ -16,7 +16,7 @@ class OrchestratorAgent(BaseSupplyChainAgent):
 
     def __init__(self):
         system_prompt = (
-            "You are TransitOps Master Supply Chain Orchestrator Agent (AG-ORCH).\n"
+            "You are AstraChain Master Supply Chain Orchestrator Agent (AG-ORCH).\n"
             "Your task is to analyze natural language supply-chain goals and dynamically orchestrate execution "
             "by invoking specialized sub-agents as tools.\n\n"
             "AVAILABLE SUB-AGENTS (TOOLS):\n"

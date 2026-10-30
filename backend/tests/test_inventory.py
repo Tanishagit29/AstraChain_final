@@ -19,7 +19,7 @@ def test_inventory_crud_lifecycle(client):
     reg_res = client.post(
         "/api/auth/register",
         json={
-            "email": "inv_tester@transitops.ai",
+            "email": "inv_tester@astrachain.ai",
             "password": "SecretPassword123!",
             "full_name": "Inventory Tester",
             "role": "OPERATIONS_LEAD"
@@ -29,7 +29,7 @@ def test_inventory_crud_lifecycle(client):
 
     login_res = client.post(
         "/api/auth/login",
-        json={"email": "inv_tester@transitops.ai", "password": "SecretPassword123!"}
+        json={"email": "inv_tester@astrachain.ai", "password": "SecretPassword123!"}
     )
     assert login_res.status_code == 200
     token = login_res.json()["data"]["access_token"]

@@ -39,6 +39,33 @@ export default function DataIntelligenceAgent() {
 
   const [activeTab, setActiveTab] = useState('preview');
 
+  // Groq LLM agent reasoning (runs in the background after the pipeline results are already shown)
+  const [agentInsights, setAgentInsights] = useState(null);
+
+  useEffect(() => {
+    if (!pipelineResult) {
+      setAgentInsights(null);
+      return undefined;
+    }
+    let cancelled = false;
+    let timer;
+    let tries = 0;
+    const poll = async () => {
+      const ins = await api.getPipelineAgents();
+      if (cancelled) return;
+      if (ins) setAgentInsights(ins);
+      tries += 1;
+      if ((!ins || ins.status === 'running' || ins.status === 'idle') && tries < 60) {
+        timer = setTimeout(poll, 3000);
+      }
+    };
+    poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [pipelineResult]);
+
   // Load existing pipeline result if available
   useEffect(() => {
     async function loadCurrentStatus() {
@@ -318,6 +345,37 @@ export default function DataIntelligenceAgent() {
                 </div>
               )}
             </div>
+
+            {/* AI Agent Insights (Groq) */}
+            {agentInsights && (
+              <div className="glass-panel rounded-xl p-lg space-y-md">
+                <h4 className="font-title-md text-title-md text-on-surface font-bold flex items-center gap-xs">
+                  <Cpu className="w-5 h-5 text-primary" /> AI Agent Insights
+                  <span className="ml-auto text-[10px] uppercase tracking-wider font-mono px-xs py-base rounded border border-primary/30 text-primary">
+                    {agentInsights.status === 'running' ? 'Analysing…' : agentInsights.status}
+                  </span>
+                </h4>
+                <p className="text-[12px] text-on-surface-variant">{agentInsights.message}</p>
+                {(agentInsights.agents || []).map((agent) => (
+                  <div key={agent.agent_id || agent.agent_name} className="border-t border-outline-variant/30 pt-sm space-y-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-label-md font-bold text-on-surface">{agent.agent_name}</span>
+                      <span className="text-[10px] font-mono uppercase text-on-surface-variant">{agent.mode}</span>
+                    </div>
+                    {agent.summary && <p className="text-[12px] text-on-surface/80 whitespace-pre-line">{agent.summary}</p>}
+                    {agent.tools_used && agent.tools_used.length > 0 && (
+                      <div className="flex flex-wrap gap-xs">
+                        {agent.tools_used.map((tool, i) => (
+                          <span key={`${tool}-${i}`} className="bg-primary/10 border border-primary/20 text-primary font-mono text-[10px] px-xs py-base rounded">
+                            {tool}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Engineered Features */}
             {result.engineered_columns && result.engineered_columns.length > 0 && (

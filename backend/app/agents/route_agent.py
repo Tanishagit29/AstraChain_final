@@ -15,7 +15,7 @@ class RouteOptimizationAgent(BaseSupplyChainAgent):
 
     def __init__(self):
         system_prompt = (
-            "You are TransitOps Route Optimization Agent (AG-04).\n"
+            "You are AstraChain Route Optimization Agent (AG-04).\n"
             "Your responsibility is to optimize delivery fleet routes, avoid traffic congestion, and maximize fuel economy.\n\n"
             "INSTRUCTIONS:\n"
             "1. Invoke `optimize_single_route` for point-to-point dispatch rerouting.\n"

@@ -15,7 +15,7 @@ class WastageAgent(BaseSupplyChainAgent):
 
     def __init__(self):
         system_prompt = (
-            "You are TransitOps Wastage & Automation Agent (AG-03). Your responsibility is to minimize perishable "
+            "You are AstraChain Wastage & Automation Agent (AG-03). Your responsibility is to minimize perishable "
             "food spoilage loss across warehouses.\n"
             "You have access to tools to fetch near-expiry items, get batch details, apply dynamic promo discounts, "
             "and request expedited rerouting via the Route Agent.\n\n"
@@ -241,6 +241,7 @@ class WastageAgent(BaseSupplyChainAgent):
     def _tool_request_expedited_route(self, db: Session, batch_id: str, destination: str) -> Dict[str, Any]:
         # Agent-to-agent handoff: invoke RouteOptimizationAgent
         route_agent = RouteOptimizationAgent()
+        route_agent.use_llm = False  # deterministic routing; avoids a nested LLM call inside a tool call
         truck_id = f"EXPRESS-TRK-{batch_id}"
         route_res = route_agent.execute(db, truck_id=truck_id, destination=destination)
 
@@ -284,40 +285,8 @@ class WastageAgent(BaseSupplyChainAgent):
             return {"status": "ERROR", "message": "Database session missing in state"}
         return self.execute(db)
 
-    def execute(self, db: Session) -> Dict[str, Any]:
-        task = (
-            "Evaluate near-expiry batches in the database. Reason about shelf life, volume, and unit cost. "
-            "Call apply_discount with custom reasoning for items where discounting prevents waste, or "
-            "call request_expedited_route if high batch value justifies rerouting."
-        )
-        res = self.run(task=task, context={"db": db})
-
-        # Ensure database activity row is logged
-        act = db.query(AgentActivity).filter(AgentActivity.agent_code == self.agent_id).first()
-        if act:
-            act.tasks_processed += 1
-            act.action = "completed autonomous ReAct evaluation for near-expiry batches."
-            act.details = res.get("final_content", "")[:250]
-            act.time_ago = "Just now"
-            db.commit()
-
-        return res
-
-    def fallback_execute(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Deterministic fallback when Groq API key is not present.
-        Ensures existing API endpoints dependent on WastageAgent structure still function smoothly.
-        """
-        db = context.get("db")
-        if not db:
-            return {
-                "status": "FALLBACK",
-                "agent_id": self.agent_id,
-                "discount_alerts_count": 0,
-                "discount_alerts": [],
-                "waste_stats": {}
-            }
-
+    def _collect_metrics(self, db: Session) -> Dict[str, Any]:
+        """Deterministic near-expiry / discount metrics (no side effects)."""
         near_expiry = WastageService.get_near_expiry_items(db)
         discount_alerts = WastageService.get_discount_recommendations(db)
         waste_stats = WastageService.get_expected_waste(db)
@@ -339,8 +308,62 @@ class WastageAgent(BaseSupplyChainAgent):
             if digits:
                 all_pcts.append(int(digits))
 
+        return {
+            "near_expiry_count": len(near_expiry),
+            "discount_alerts_count": len(discount_alerts),
+            "discount_alerts": alert_details,
+            "discount_pct_min": min(all_pcts) if all_pcts else 0,
+            "discount_pct_max": max(all_pcts) if all_pcts else 0,
+            "waste_stats": waste_stats,
+        }
+
+    def execute(self, db: Session) -> Dict[str, Any]:
+        task = (
+            "Evaluate near-expiry batches in the database. Reason about shelf life, volume, and unit cost. "
+            "Call apply_discount with custom reasoning for items where discounting prevents waste, or "
+            "call request_expedited_route if high batch value justifies rerouting."
+        )
+        res = self.run(task=task, context={"db": db})
+
+        # The LLM path only returns free text + tool traces; add the structured keys API consumers expect.
+        try:
+            for key, value in self._collect_metrics(db).items():
+                res.setdefault(key, value)
+        except Exception:
+            db.rollback()
+
+        # Log the autonomous run (the deterministic fallback logs its own activity row)
+        if res.get("status") != "FALLBACK":
+            act = db.query(AgentActivity).filter(AgentActivity.agent_code == self.agent_id).first()
+            if act:
+                act.tasks_processed += 1
+                act.action = "completed autonomous ReAct evaluation for near-expiry batches."
+                act.details = (res.get("final_content") or "")[:250]
+                act.time_ago = "Just now"
+                db.commit()
+
+        return res
+
+    def fallback_execute(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Deterministic fallback when the Groq LLM is unavailable, disabled, or failed.
+        Ensures existing API endpoints dependent on WastageAgent structure still function smoothly.
+        """
+        db = context.get("db")
+        if not db:
+            return {
+                "status": "FALLBACK",
+                "agent_id": self.agent_id,
+                "discount_alerts_count": 0,
+                "discount_alerts": [],
+                "waste_stats": {}
+            }
+
+        metrics = self._collect_metrics(db)
+        waste_stats = metrics["waste_stats"]
+
         act = db.query(AgentActivity).filter(AgentActivity.agent_code == self.agent_id).first()
-        action_msg = f"triggered {len(discount_alerts)} discount alerts for near-expiry batches."
+        action_msg = f"triggered {metrics['discount_alerts_count']} discount alerts for near-expiry batches."
         details_msg = f"Monitored inventory shelf life. Estimated salvage value: {waste_stats.get('projected_salvage_value', '₹0')}."
 
         if act:
@@ -369,12 +392,7 @@ class WastageAgent(BaseSupplyChainAgent):
             "status": "FALLBACK",
             "agent_id": self.agent_id,
             "agent_name": self.name,
-            "near_expiry_count": len(near_expiry),
-            "discount_alerts_count": len(discount_alerts),
-            "discount_alerts": alert_details,
-            "discount_pct_min": min(all_pcts) if all_pcts else 0,
-            "discount_pct_max": max(all_pcts) if all_pcts else 0,
-            "waste_stats": waste_stats,
+            **metrics,
             "tools_executed": [],
-            "reasoning_steps": ["Groq API key missing. Executed deterministic fallback."]
+            "reasoning_steps": ["Groq API unavailable or disabled. Executed deterministic fallback."]
         }

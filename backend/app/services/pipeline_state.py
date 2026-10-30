@@ -56,6 +56,16 @@ class PipelineState:
         # (the decisions list only holds the highest-priority sample of a large dataset).
         self._wastage_offset: Dict[str, int] = {}
 
+        # LLM agent insights (Groq). Filled in the background AFTER the deterministic pipeline has finished,
+        # so a slow or failing LLM can never block or break the pipeline results.
+        self.agent_insights: Dict[str, Any] = {
+            "status": "idle",  # idle | running | completed | skipped | error
+            "message": "No pipeline has been run yet.",
+            "started_at": None,
+            "finished_at": None,
+            "agents": [],
+        }
+
         # Pipeline stage status
         self.stages: Dict[str, str] = {
             "upload": "pending",
@@ -72,6 +82,17 @@ class PipelineState:
         self.has_run = True
         for key in self.stages:
             self.stages[key] = "pending"
+        self.agent_insights = {
+            "status": "idle",
+            "message": "Pipeline running.",
+            "started_at": None,
+            "finished_at": None,
+            "agents": [],
+        }
+
+    def set_agent_insights(self, **fields: Any):
+        """Merge fields into the LLM agent-insights record (status/message/agents/timestamps)."""
+        self.agent_insights = {**self.agent_insights, **fields}
 
     def update_stage(self, stage: str, status: str):
         """Update a pipeline stage status: pending, running, completed, error."""
@@ -116,6 +137,45 @@ class PipelineState:
     ):
         self.inventory_analysis = inventory_analysis
         self.inventory_summary = inventory_summary
+
+    def restock_item(self, product_id: str, quantity: int = 500) -> Optional[Dict[str, Any]]:
+        """Restock an item in pipeline inventory_analysis, clearing its stockout status."""
+        for item in self.inventory_analysis:
+            pid = str(item.get("product_id", "")).strip().lower()
+            pname = str(item.get("product_name", "")).strip().lower()
+            target = str(product_id).strip().lower()
+            if pid == target or pname == target or target in pid or target in pname:
+                old_stock = int(item.get("current_stock", 0) or 0)
+                new_stock = old_stock + quantity
+                item["current_stock"] = new_stock
+                pred_demand = max(1, int(item.get("predicted_demand", 0) or 1))
+                new_ratio = round(new_stock / pred_demand, 2)
+                item["stock_ratio"] = new_ratio
+                item["status"] = "Optimal Stock" if new_ratio >= 0.7 else "Low Stock"
+                item["recommended_action"] = "Optimal level" if new_ratio >= 0.7 else "Minor reorder"
+                item["suggested_reorder_qty"] = 0
+                item["is_restocked"] = True
+                self._refresh_inventory_summary()
+                return item
+        return None
+
+    def _refresh_inventory_summary(self):
+        total = len(self.inventory_analysis)
+        if total == 0:
+            return
+        available = sum(1 for i in self.inventory_analysis if i.get("status") in ["Optimal Stock", "Healthy", "Available"])
+        low_stock = sum(1 for i in self.inventory_analysis if i.get("status") == "Low Stock")
+        stockouts = sum(1 for i in self.inventory_analysis if i.get("status") == "Stockout Risk")
+        overstock = sum(1 for i in self.inventory_analysis if i.get("status") == "Overstock")
+        healthy_pct = round((available / total) * 100, 1)
+        self.inventory_summary = {
+            "total_items": total,
+            "available_count": available,
+            "low_stock_count": low_stock,
+            "stockout_count": stockouts,
+            "overstock_count": overstock,
+            "healthy_pct": healthy_pct
+        }
 
     def set_wastage_results(
         self,
@@ -314,6 +374,7 @@ class PipelineState:
             "available_fields": self.available_fields,
             "missing_field_warnings": self.missing_field_warnings,
             "expiry_available": self.expiry_available,
+            "agent_insights_status": self.agent_insights.get("status"),
         }
 
 

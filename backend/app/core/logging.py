@@ -11,7 +11,7 @@ def setup_logging():
             logging.StreamHandler(sys.stdout)
         ]
     )
-    logger = logging.getLogger("transitops")
+    logger = logging.getLogger("astrachain")
     logger.info(f"Logging initialized at level {settings.LOG_LEVEL}")
     return logger
 

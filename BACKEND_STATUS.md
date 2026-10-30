@@ -1,4 +1,4 @@
-# TransitOps Backend Status & Architecture Overview
+# AstraChain Backend Status & Architecture Overview
 
 **Status**: Production-Ready / Fully Functional End-to-End  
 **Date**: August 2026  

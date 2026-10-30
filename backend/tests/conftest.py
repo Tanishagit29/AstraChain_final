@@ -69,7 +69,7 @@ def auth_headers(client):
     client.post(
         "/api/auth/register",
         json={
-            "email": "multi_agent_tester@transitops.ai",
+            "email": "multi_agent_tester@astrachain.ai",
             "password": "SecretPassword123!",
             "full_name": "Multi Agent Tester",
             "role": "OPERATIONS_LEAD"
@@ -77,7 +77,7 @@ def auth_headers(client):
     )
     login_res = client.post(
         "/api/auth/login",
-        json={"email": "multi_agent_tester@transitops.ai", "password": "SecretPassword123!"}
+        json={"email": "multi_agent_tester@astrachain.ai", "password": "SecretPassword123!"}
     )
     token = login_res.json()["data"]["access_token"]
     return {"Authorization": f"Bearer {token}"}

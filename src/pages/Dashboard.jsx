@@ -6,13 +6,14 @@ import AIRecommendationCard from '../components/AIRecommendationCard';
 import { api } from '../api/client';
 import { 
   DollarSign, PackageCheck, AlertTriangle, Trash2, Sparkles, Activity,
-  Database, TrendingUp, UploadCloud
+  Database, TrendingUp, UploadCloud, CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [toastMessage, setToastMessage] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -73,6 +74,23 @@ export default function Dashboard() {
   const logs = data.recentActivityLogs || [];
   const health = data.healthIndicators || {};
 
+  const handleExecuteRecommendation = async (rec) => {
+    if (rec.type === 'HIGH_RISK' || rec.actionText?.includes('Restock')) {
+      const pid = rec.product_id || rec.product;
+      const res = await api.restockProduct({ product_id: pid, quantity: 500 });
+      if (res && res.success) {
+        setToastMessage(`Restocked ${res.product_name || rec.product} (+500 units)! Stockout risk resolved.`);
+        setTimeout(() => setToastMessage(null), 4000);
+        api.getPipelineDashboard().then((updated) => {
+          if (updated) setData(updated);
+        });
+      }
+    } else if (rec.type === 'EXPIRED') {
+      setToastMessage(`Quarantine verified: ${rec.product} marked do-not-sell.`);
+      setTimeout(() => setToastMessage(null), 4000);
+    }
+  };
+
   return (
     <div className="space-y-lg">
       {/* Page Header */}
@@ -80,6 +98,14 @@ export default function Dashboard() {
         title="Operations Dashboard"
         subtitle="Real-time predictive intelligence, XGBoost forecasting & automated decisions."
       />
+
+      {/* Success Notification Banner */}
+      {toastMessage && (
+        <div className="p-md rounded-xl bg-secondary/15 border border-secondary/30 text-secondary font-bold flex items-center gap-sm shadow-md animate-fade-in">
+          <CheckCircle2 className="w-5 h-5 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
       {/* Pipeline Status Banner */}
       {data.pipeline_timestamp && (
@@ -176,7 +202,11 @@ export default function Dashboard() {
 
             <div className="space-y-md">
               {recs.map((rec) => (
-                <AIRecommendationCard key={rec.id} recommendation={rec} />
+                <AIRecommendationCard
+                  key={rec.id}
+                  recommendation={rec}
+                  onExecute={handleExecuteRecommendation}
+                />
               ))}
             </div>
           </div>

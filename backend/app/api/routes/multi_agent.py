@@ -176,7 +176,7 @@ def execute_key_action(
         notification_title = "Supplier Notified"
     elif act_type == "DISCOUNT_SUGGESTION":
         msg = f"Discount Suggestion applied for near-expiry item '{payload.target_id}'. Dynamic markdown live."
-        notification_title = "Discount Alert Triggered"
+        notification_title = "Discount Recommendation Applied"
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

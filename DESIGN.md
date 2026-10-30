@@ -1,8 +1,8 @@
-# TransitOps Design System
+# AstraChain Design System
 
 ## 1. Overview & Brand Identity
 
-The **TransitOps AI Control Tower Design System** is engineered for high-density enterprise supply chain operations and AI copilot interactions. Built on a **Modern Minimalist** core with a technical "Night-Vision" aesthetic, it minimizes cognitive load and eye fatigue while delivering crisp visual hierarchy for telemetry, analytics, stock flow, and real-time AI recommendations.
+The **AstraChain AI Control Tower Design System** is engineered for high-density enterprise supply chain operations and AI copilot interactions. Built on a **Modern Minimalist** core with a technical "Night-Vision" aesthetic, it minimizes cognitive load and eye fatigue while delivering crisp visual hierarchy for telemetry, analytics, stock flow, and real-time AI recommendations.
 
 ### Core Visual Principles
 - **Modern Minimalism:** Clean line work, subtle glass depth, and structured density without extraneous decoration.
@@ -246,7 +246,7 @@ The **TransitOps AI Control Tower Design System** is engineered for high-density
 
 ### 8.1 Desktop Side Navigation Shell
 - **Position & Dimensions:** Fixed left positioning, `width: 280px`, `height: 100vh`, `border-r border-outline-variant`.
-- **Brand Header:** Icon container in `bg-primary-container` with `transit_enterexit` icon, title "TransitOps" in `text-primary`, subtitle "AI CONTROL TOWER" in uppercase `text-label-sm`.
+- **Brand Header:** Icon container in `bg-primary-container` with `transit_enterexit` icon, title "AstraChain" in `text-primary`, subtitle "AI CONTROL TOWER" in uppercase `text-label-sm`.
 - **Navigation Links:**
   - Active: `bg-secondary-container text-on-secondary-container rounded-lg border-l-2 border-primary scale-95`.
   - Inactive: `text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50 transition-colors rounded-lg`.

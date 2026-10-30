@@ -8,7 +8,7 @@ export default function AICopilot() {
     {
       id: 1,
       sender: 'bot',
-      text: 'Hello Alex! I am your TransitOps AI Copilot. How can I assist with supply chain telemetry, stock reordering, or route optimization today?',
+      text: 'Hello Alex! I am your AstraChain AI Copilot. How can I assist with supply chain telemetry, stock reordering, or route optimization today?',
       timestamp: '10:14 AM',
     },
     {
@@ -115,7 +115,7 @@ export default function AICopilot() {
               >
                 <div className="flex justify-between items-center gap-md">
                   <span className="font-bold text-label-md">
-                    {msg.sender === 'user' ? 'Daksh Mehta' : 'TransitOps Copilot Agent'}
+                    {msg.sender === 'user' ? 'Daksh Mehta' : 'AstraChain Copilot Agent'}
                   </span>
                   <span className="text-[10px] text-on-surface-variant font-mono">{msg.timestamp}</span>
                 </div>

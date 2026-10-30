@@ -3,9 +3,10 @@ import PageHeader from '../components/PageHeader';
 import KPICard from '../components/KPICard';
 import StatusBadge from '../components/StatusBadge';
 import { api } from '../api/client';
+import { useLiveNotifications } from '../context/NotificationContext';
 import {
-  Trash2, DollarSign, Tag, Zap, AlertTriangle, UploadCloud, Database, ShieldAlert,
-  BarChart3, CheckCircle2, Flame, Search, ArrowRight, Plus, X, Sparkles, Clock, Package
+  Trash2, DollarSign, Tag, AlertTriangle, UploadCloud, Database, ShieldAlert,
+  BarChart3, CheckCircle2, Search, ArrowRight, Plus, X, Sparkles, Clock, Package, RotateCw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -27,6 +28,10 @@ export default function WastageManagement() {
   const [filterDecision, setFilterDecision] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [actionSuccess, setActionSuccess] = useState(null);
+  const [mitigatingId, setMitigatingId] = useState(null);
+  const [mitigatedIds, setMitigatedIds] = useState(new Set());
+
+  const { handleMitigateWastage } = useLiveNotifications();
 
   // Modal & Form State for Adding Near-Expiry Items
   const [showAddModal, setShowAddModal] = useState(false);
@@ -113,19 +118,6 @@ export default function WastageManagement() {
     });
   }, [decisions]);
 
-  const handleApplyDiscountAction = async (item) => {
-    try {
-      await api.executeKeyAction({
-        action_type: 'DISCOUNT_SUGGESTION',
-        target_id: item.product_id || item.product_name,
-        details: `Dynamic promo markdown applied for batch ${item.product_name}`
-      });
-      setActionSuccess(`Promo Markdown Applied: ${item.product_name} (${item.discount})`);
-      setTimeout(() => setActionSuccess(null), 4000);
-    } catch (e) {
-      console.error('Failed to execute discount action:', e);
-    }
-  };
 
   const handleAddNearExpirySubmit = async (e) => {
     if (e) e.preventDefault();
@@ -231,7 +223,7 @@ export default function WastageManagement() {
       <div className="space-y-lg">
         <PageHeader
           title="Automation & Expiry Agent"
-          subtitle="Automates actions and reduces wastage by outputting dynamic discount alerts for near-expiry perishable items."
+          subtitle="Automates actions and reduces wastage by monitoring shelf-life for near-expiry perishable items."
           actions={actionButtons}
         />
 
@@ -483,7 +475,7 @@ export default function WastageManagement() {
     <div className="space-y-lg">
       <PageHeader
         title="Automation & Expiry Agent"
-        subtitle="Automates dynamic discount promo alerts for near-expiry products to minimize waste & maximize salvage value."
+        subtitle="Monitors and manages near-expiry products to minimize waste & maximize salvage value."
         actions={actionButtons}
       />
 
@@ -512,10 +504,10 @@ export default function WastageManagement() {
           icon={Tag}
         />
         <KPICard
-          title="Discount Alerts Triggered"
+          title="Clearance Recommendations"
           value={`${summary.discount_count || 0} Item Promos`}
           status="positive"
-          subtitle="Automated clearance markdowns"
+          subtitle="Clearance markdown opportunities"
           icon={DollarSign}
         />
         <KPICard
@@ -620,70 +612,7 @@ export default function WastageManagement() {
         </div>
       </div>
 
-      {/* NEAR-EXPIRY DYNAMIC PROMO ITEM CARDS */}
-      {discountItems.length > 0 && (
-        <div className="glass-card rounded-xl p-lg space-y-md border border-tertiary/30">
-          <div className="flex items-center justify-between flex-wrap gap-xs">
-            <div className="flex items-center gap-xs text-tertiary">
-              <Zap className="w-5 h-5 text-tertiary" />
-              <h3 className="font-title-md text-title-md text-on-surface font-bold">Automated Dynamic Discount Alerts</h3>
-            </div>
-            <div className="flex items-center gap-sm">
-              <span className="font-label-sm text-on-surface-variant font-mono bg-surface-container-high px-sm py-1 rounded">
-                {discountItems.length} Active Item Promo Recommendations
-              </span>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="text-label-sm font-bold text-tertiary bg-tertiary/10 hover:bg-tertiary/20 px-sm py-1 rounded-lg border border-tertiary/30 transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add Item
-              </button>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-md">
-            {discountItems.slice(0, 6).map((item, idx) => (
-              <div key={idx} className="p-md rounded-lg bg-surface-container-low border border-outline-variant space-y-xs flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-xs">
-                    <span className={`px-xs py-0.5 rounded font-label-sm font-bold ${
-                      item.days_remaining <= 2 ? 'bg-error/20 text-error border border-error/30' :
-                      item.days_remaining <= 4 ? 'bg-tertiary/20 text-tertiary border border-tertiary/30' :
-                      'bg-secondary/20 text-secondary'
-                    }`}>
-                      {item.days_remaining} Day(s) to Expiry
-                    </span>
-                    <span className="font-mono text-[11px] text-on-surface-variant">{item.product_id}</span>
-                  </div>
-
-                  <h4 className="font-bold text-on-surface text-body-md truncate">{item.product_name}</h4>
-                  {item.expiry_date && (
-                    <p className="font-label-sm text-on-surface-variant font-mono mt-0.5">Expires: {item.expiry_date}</p>
-                  )}
-
-                  <div className="p-xs rounded bg-tertiary/10 border border-tertiary/20 text-tertiary font-label-md font-bold mt-sm">
-                    Recommended: {item.discount} Discount
-                    {item.discounted_price != null && item.mrp != null && (
-                      <span className="block font-mono text-[11px] font-normal mt-0.5">
-                        MRP ₹{Number(item.mrp).toLocaleString()} → ₹{Number(item.discounted_price).toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleApplyDiscountAction(item)}
-                  className="w-full mt-md bg-tertiary/15 hover:bg-tertiary text-tertiary hover:text-on-tertiary font-bold py-1.5 px-md rounded-lg text-label-md transition-all border border-tertiary/30 flex items-center justify-center gap-xs cursor-pointer"
-                >
-                  <Flame className="w-3.5 h-3.5" />
-                  Apply Automated Markdown
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* EXPIRED ITEMS ALERT CARDS */}
       {expiredItems.length > 0 && (
@@ -774,54 +703,95 @@ export default function WastageManagement() {
                 <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Decision</th>
                 <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Discount</th>
                 <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Reason & Agent Intervention</th>
+                <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Manager Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30 text-body-md">
               {filteredDecisions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-lg py-xl text-center text-on-surface-variant italic">
+                  <td colSpan={8} className="px-lg py-xl text-center text-on-surface-variant italic">
                     No wastage item decisions match the current filter or search query.
                   </td>
                 </tr>
               ) : (
-                filteredDecisions.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-surface-variant/20 transition-colors">
-                    <td className="px-lg py-md">
-                      <div className="font-bold text-on-surface text-body-md">{item.product_name}</div>
-                    </td>
-                    <td className="px-lg py-md font-mono text-on-surface-variant">{item.product_id}</td>
-                    <td className="px-lg py-md font-mono text-on-surface-variant">
-                      {item.expiry_date || 'N/A'}
-                    </td>
-                    <td className="px-lg py-md font-mono font-bold">
-                      {item.days_remaining !== null && item.days_remaining !== undefined ? (
-                        item.days_remaining < 0 ? (
-                          <span className="px-xs py-0.5 rounded bg-error/20 text-error font-bold text-[12px]">
-                            Expired ({Math.abs(item.days_remaining)}d ago)
-                          </span>
+                filteredDecisions.map((item, idx) => {
+                  const itemId = item.product_id || item.product_name;
+                  const isMitigated = mitigatedIds.has(itemId) || item.is_mitigated;
+                  const isNearExpiry = item.days_remaining !== null && item.days_remaining !== undefined && item.days_remaining <= 5 && item.days_remaining >= 0;
+
+                  return (
+                    <tr key={idx} className="hover:bg-surface-variant/20 transition-colors">
+                      <td className="px-lg py-md">
+                        <div className="font-bold text-on-surface text-body-md">{item.product_name}</div>
+                      </td>
+                      <td className="px-lg py-md font-mono text-on-surface-variant">{item.product_id}</td>
+                      <td className="px-lg py-md font-mono text-on-surface-variant">
+                        {item.expiry_date || 'N/A'}
+                      </td>
+                      <td className="px-lg py-md font-mono font-bold">
+                        {item.days_remaining !== null && item.days_remaining !== undefined ? (
+                          item.days_remaining < 0 ? (
+                            <span className="px-xs py-0.5 rounded bg-error/20 text-error font-bold text-[12px]">
+                              Expired ({Math.abs(item.days_remaining)}d ago)
+                            </span>
+                          ) : (
+                            <span className={item.days_remaining <= 2 ? 'text-error font-bold' : item.days_remaining <= 5 ? 'text-tertiary font-bold' : 'text-on-surface'}>
+                              {item.days_remaining} {item.days_remaining === 1 ? 'day' : 'days'}
+                            </span>
+                          )
                         ) : (
-                          <span className={item.days_remaining <= 2 ? 'text-error font-bold' : item.days_remaining <= 5 ? 'text-tertiary font-bold' : 'text-on-surface'}>
-                            {item.days_remaining} {item.days_remaining === 1 ? 'day' : 'days'}
+                          <span className="text-on-surface-variant">—</span>
+                        )}
+                      </td>
+                      <td className="px-lg py-md">
+                        <StatusBadge status={getDecisionBadge(item.decision)} />
+                      </td>
+                      <td className="px-lg py-md font-mono font-bold text-tertiary">
+                        {item.discount}
+                        {item.discounted_price != null && (
+                          <span className="block text-[11px] font-normal text-on-surface-variant">₹{Number(item.discounted_price).toLocaleString()}</span>
+                        )}
+                      </td>
+                      <td className="px-lg py-md text-on-surface-variant max-w-xs truncate" title={item.reason}>
+                        {item.reason}
+                      </td>
+                      <td className="px-lg py-md">
+                        {isMitigated ? (
+                          <span className="text-emerald-400 font-bold text-[11px] font-mono flex items-center gap-1 bg-emerald-500/15 px-2 py-1 rounded-md border border-emerald-500/30">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Markdown Active
                           </span>
-                        )
-                      ) : (
-                        <span className="text-on-surface-variant">—</span>
-                      )}
-                    </td>
-                    <td className="px-lg py-md">
-                      <StatusBadge status={getDecisionBadge(item.decision)} />
-                    </td>
-                    <td className="px-lg py-md font-mono font-bold text-tertiary">
-                      {item.discount}
-                      {item.discounted_price != null && (
-                        <span className="block text-[11px] font-normal text-on-surface-variant">₹{Number(item.discounted_price).toLocaleString()}</span>
-                      )}
-                    </td>
-                    <td className="px-lg py-md text-on-surface-variant max-w-xs truncate" title={item.reason}>
-                      {item.reason}
-                    </td>
-                  </tr>
-                ))
+                        ) : isNearExpiry ? (
+                          <button
+                            onClick={async () => {
+                              setMitigatingId(itemId);
+                              try {
+                                await handleMitigateWastage({
+                                  product_id: itemId,
+                                  discount: item.discount,
+                                });
+                                setMitigatedIds((prev) => new Set(prev).add(itemId));
+                              } finally {
+                                setMitigatingId(null);
+                              }
+                            }}
+                            disabled={mitigatingId === itemId}
+                            className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-bold px-2.5 py-1.5 rounded-lg text-label-sm flex items-center gap-1 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                            title="Activate dynamic promotional markdown across catalog"
+                          >
+                            {mitigatingId === itemId ? (
+                              <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Clock className="w-3.5 h-3.5" />
+                            )}
+                            <span>Apply Markdown</span>
+                          </button>
+                        ) : (
+                          <span className="text-on-surface-variant text-[11px] font-mono">Standard Track</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -7,6 +7,16 @@ from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.agents.base_agent import (
+    llm_available,
+    llm_breaker,
+    make_groq_client,
+    is_tool_format_error,
+    is_rate_limit_error,
+    coerce_tool_args,
+    serialize_tool_result,
+)
+from app.services.pipeline_state import pipeline_state
 from app.models.all_models import Inventory, Supplier, Wastage, Route, Forecast, Product
 from app.services.inventory_service import InventoryService
 from app.services.wastage_service import WastageService
@@ -16,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class AIProvider(ABC):
     """
-    Abstract AI Provider Interface for TransitOps LLM Integration.
+    Abstract AI Provider Interface for AstraChain LLM Integration.
     """
     @abstractmethod
     def generate_response(
@@ -57,6 +67,15 @@ class DatabaseFallbackAIProvider(AIProvider):
     ) -> str:
         q = user_query.lower()
 
+        # 0. Questions about the uploaded dataset / pipeline run
+        pipeline_ctx = context_data.get("pipeline")
+        if pipeline_ctx and any(w in q for w in ["dataset", "pipeline", "upload", "overview", "summary", "csv", "status"]):
+            return (
+                f"Latest pipeline run: {pipeline_ctx['total_rows']} cleaned rows across {pipeline_ctx['total_products']} products. "
+                f"Inventory: {pipeline_ctx['stockout_count']} stockout risks, {pipeline_ctx['overstock_count']} overstocked. "
+                f"Wastage: {pipeline_ctx['near_expiry_count']} near-expiry items, {pipeline_ctx['expired_count']} expired."
+            )
+
         # 1. Stockout / Reorder queries
         if any(w in q for w in ["reorder", "stockout", "low stock", "safety stock", "inventory"]):
             high_risk = context_data.get("high_risk_items", [])
@@ -95,7 +114,7 @@ class DatabaseFallbackAIProvider(AIProvider):
             return "Demand Forecast Analytics: Predictive XGBoost models indicate a +12.4% demand increase across Dairy & Staples for the upcoming 30-day horizon."
 
         total_skus = context_data.get("total_skus", 30)
-        return f"TransitOps AI Copilot active. Monitoring {total_skus} SKUs and delivery fleet routes. All sub-agents are online."
+        return f"AstraChain AI Copilot active. Monitoring {total_skus} SKUs and delivery fleet routes. All sub-agents are online."
 
 
 class GroqAIProvider(AIProvider):
@@ -135,6 +154,14 @@ class GroqAIProvider(AIProvider):
                 "function": {
                     "name": "get_fleet_status",
                     "description": "Fetch real-time delivery truck route telemetry, delays, and thermal readings.",
+                    "parameters": {"type": "object", "properties": {}, "required": []}
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_pipeline_results",
+                    "description": "Fetch the results of the latest uploaded-dataset pipeline run: dataset summary, inventory stockout/overstock counts and top items, near-expiry wastage decisions.",
                     "parameters": {"type": "object", "properties": {}, "required": []}
                 }
             },
@@ -225,6 +252,18 @@ class GroqAIProvider(AIProvider):
                     ]
                 }
 
+            elif tool_name == "get_pipeline_results":
+                if not pipeline_state.has_run:
+                    return {"has_data": False, "message": "No dataset has been uploaded yet."}
+                return {
+                    "has_data": True,
+                    "dataset_summary": pipeline_state.dataset_summary,
+                    "inventory_summary": pipeline_state.inventory_summary,
+                    "top_inventory_items": pipeline_state.inventory_analysis[:10],
+                    "wastage_summary": pipeline_state.wastage_summary,
+                    "top_wastage_decisions": pipeline_state.wastage_decisions[:10],
+                }
+
             elif tool_name == "get_demand_forecast":
                 sku = args.get("product_code", "MK-001-F")
                 forecasts = db.query(Forecast).limit(10).all()
@@ -242,6 +281,10 @@ class GroqAIProvider(AIProvider):
 
             return {"error": f"Unknown tool '{tool_name}'"}
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             return {"error": f"Failed executing tool '{tool_name}': {str(e)}"}
 
     def generate_response(
@@ -254,6 +297,10 @@ class GroqAIProvider(AIProvider):
         res = self.generate_response_details(user_query, context_data, session_history, db)
         return res["reply"]
 
+    def _fallback(self, user_query, context_data, session_history, db, reason: str) -> Dict[str, Any]:
+        reply = DatabaseFallbackAIProvider().generate_response(user_query, context_data, session_history, db)
+        return {"reply": reply, "tools_executed": [], "reasoning_steps": [reason]}
+
     def generate_response_details(
         self,
         user_query: str,
@@ -261,50 +308,57 @@ class GroqAIProvider(AIProvider):
         session_history: Optional[List[Dict[str, Any]]] = None,
         db: Optional[Session] = None,
     ) -> Dict[str, Any]:
-        api_key = os.getenv("GROQ_API_KEY") or getattr(settings, "GROQ_API_KEY", None)
-        if not api_key:
-            reply = DatabaseFallbackAIProvider().generate_response(user_query, context_data, session_history, db)
-            return {
-                "reply": reply,
-                "tools_executed": [],
-                "reasoning_steps": ["Groq API key unconfigured; used database fallback provider."]
-            }
+        if not llm_available():
+            why = "Groq API key unconfigured" if not (os.getenv("GROQ_API_KEY") or getattr(settings, "GROQ_API_KEY", None)) \
+                else f"Groq cooling down after an error ({llm_breaker.last_error})"
+            return self._fallback(user_query, context_data, session_history, db, f"{why}; used database fallback provider.")
 
-        tools_executed = []
-        reasoning_steps = []
+        client = make_groq_client()
+        if client is None:
+            return self._fallback(user_query, context_data, session_history, db, "Groq client unavailable; used database fallback provider.")
+
+        tools_executed: List[Dict[str, Any]] = []
+        reasoning_steps: List[str] = []
 
         try:
-            from groq import Groq
-            client = Groq(api_key=api_key)
-
             system_prompt = (
-                "You are TransitOps AI Copilot (AG-06), an expert supply chain assistant. "
+                "You are AstraChain AI Copilot (AG-06), an expert supply chain assistant. "
                 "Use available database query tools to retrieve real-time metrics when answering questions. "
-                "Pay attention to conversation history to answer follow-up questions accurately."
+                "When the user asks about their uploaded dataset or pipeline results, call get_pipeline_results. "
+                "Pay attention to conversation history to answer follow-up questions accurately. Keep answers concise."
             )
 
             messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
 
-            if session_history:
-                for turn in session_history[-8:]:
-                    messages.append({
-                        "role": turn.get("role", "user"),
-                        "content": turn.get("content", "")
-                    })
+            # Groq rejects orphan tool/system turns, so only replay plain user/assistant messages.
+            for turn in (session_history or [])[-8:]:
+                role = turn.get("role")
+                text = turn.get("content") or ""
+                if role in ("user", "assistant") and text:
+                    messages.append({"role": role, "content": text})
 
             messages.append({"role": "user", "content": user_query})
 
             final_reply = ""
+            content = ""
             for step in range(3):
-                response = client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    tools=self.tools,
-                    tool_choice="auto"
-                )
+                response = None
+                for attempt in range(2):
+                    try:
+                        response = client.chat.completions.create(
+                            model=self.model,
+                            messages=messages,
+                            tools=self.tools,
+                            tool_choice="auto",
+                        )
+                        break
+                    except Exception as call_err:
+                        if is_rate_limit_error(call_err) and attempt == 0:
+                            time.sleep(1.5)
+                            continue
+                        raise
 
-                choice = response.choices[0]
-                msg = choice.message
+                msg = response.choices[0].message
                 content = msg.content or ""
                 tool_calls = getattr(msg, "tool_calls", None)
 
@@ -313,27 +367,28 @@ class GroqAIProvider(AIProvider):
                     reasoning_steps.append(f"Step {step + 1}: LLM synthesized answer.")
                     break
 
-                tool_calls_serialized = [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {"name": tc.function.name, "arguments": tc.function.arguments}
-                    }
-                    for tc in tool_calls
-                ]
                 messages.append({
                     "role": "assistant",
                     "content": content,
-                    "tool_calls": tool_calls_serialized
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {"name": tc.function.name, "arguments": tc.function.arguments or "{}"},
+                        }
+                        for tc in tool_calls
+                    ],
                 })
 
                 for tc in tool_calls:
                     fn_name = tc.function.name
                     raw_args = tc.function.arguments
                     try:
-                        args = json.loads(raw_args) if raw_args else {}
+                        parsed = json.loads(raw_args) if raw_args else {}
                     except json.JSONDecodeError:
-                        args = {}
+                        parsed = {}
+                    schema = next((t for t in self.tools if t["function"]["name"] == fn_name), {})
+                    args = coerce_tool_args(schema, parsed)
 
                     reasoning_steps.append(f"Step {step + 1}: Tool call '{fn_name}' with args {args}")
                     tool_res = self._execute_tool(fn_name, args, db)
@@ -348,7 +403,7 @@ class GroqAIProvider(AIProvider):
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc.id,
-                        "content": json.dumps(tool_res, default=str)
+                        "content": serialize_tool_result(tool_res),
                     })
 
             if not final_reply:
@@ -361,19 +416,16 @@ class GroqAIProvider(AIProvider):
             }
 
         except Exception as e:
-            logger.warning(f"Groq API call error: {e}. Falling back to DatabaseFallbackAIProvider.")
-            reply = DatabaseFallbackAIProvider().generate_response(user_query, context_data, session_history, db)
-            return {
-                "reply": reply,
-                "tools_executed": [],
-                "reasoning_steps": [f"Groq error ({str(e)}); executed DB fallback."]
-            }
+            if is_tool_format_error(e):
+                logger.warning(f"Groq produced a malformed tool call: {e}. Using database fallback for this query.")
+            else:
+                llm_breaker.trip(e)
+            return self._fallback(user_query, context_data, session_history, db, f"Groq error ({str(e)[:200]}); executed DB fallback.")
 
 
 class AIServiceFactory:
     @staticmethod
     def get_provider() -> AIProvider:
-        api_key = os.getenv("GROQ_API_KEY") or getattr(settings, "GROQ_API_KEY", None)
-        if api_key:
+        if llm_available():
             return GroqAIProvider()
         return DatabaseFallbackAIProvider()

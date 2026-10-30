@@ -15,7 +15,7 @@ class ForecastAgent(BaseSupplyChainAgent):
 
     def __init__(self):
         system_prompt = (
-            "You are TransitOps Demand & Forecasting Agent (AG-01).\n"
+            "You are AstraChain Demand & Forecasting Agent (AG-01).\n"
             "Your responsibility is to analyze historical point-of-sale data, run XGBoost predictive algorithms, "
             "and project demand bounds for products over a specified horizon.\n\n"
             "INSTRUCTIONS:\n"

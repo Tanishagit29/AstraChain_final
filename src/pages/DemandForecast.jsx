@@ -3,10 +3,11 @@ import PageHeader from '../components/PageHeader';
 import ChartCard from '../components/ChartCard';
 import KPICard from '../components/KPICard';
 import { api } from '../api/client';
+import { useLiveNotifications } from '../context/NotificationContext';
 import {
   TrendingUp, Cpu, Target, BarChart3, Database, UploadCloud,
   PartyPopper, CalendarDays, Sparkles, AlertTriangle, ShieldCheck, Flame, Zap,
-  SlidersHorizontal, CheckCircle2, Layers, Sparkle, ArrowRight
+  SlidersHorizontal, CheckCircle2, Layers, Sparkle, ArrowRight, RotateCw
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -37,6 +38,10 @@ function FestivalItemDemandPredictor() {
   const [selectedFestival, setSelectedFestival] = useState('Diwali');
   const [itemDemandData, setItemDemandData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [prestockingId, setPrestockingId] = useState(null);
+  const [prestockedIds, setPrestockedIds] = useState(new Set());
+
+  const { handlePrestockFestival } = useLiveNotifications();
 
   useEffect(() => {
     let isMounted = true;
@@ -181,12 +186,13 @@ function FestivalItemDemandPredictor() {
                   <th className="px-md py-sm text-label-sm text-on-surface-variant uppercase font-mono">Festival Sales</th>
                   <th className="px-md py-sm text-label-sm text-on-surface-variant uppercase font-mono">Extra Buffer Needed</th>
                   <th className="px-md py-sm text-label-sm text-on-surface-variant uppercase font-mono">Stock Risk Status</th>
+                  <th className="px-md py-sm text-label-sm text-on-surface-variant uppercase font-mono">1-Click Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/30 text-body-md">
                 {(!itemDemandData?.items || itemDemandData.items.length === 0) && (
                   <tr>
-                    <td colSpan={8} className="px-md py-lg text-center text-on-surface-variant italic">
+                    <td colSpan={9} className="px-md py-lg text-center text-on-surface-variant italic">
                       No demand predictions available for {selectedFestival}.
                     </td>
                   </tr>
@@ -234,6 +240,39 @@ function FestivalItemDemandPredictor() {
                         <span className="inline-flex items-center gap-1 px-xs py-0.5 rounded font-label-sm font-bold bg-primary/10 text-primary border border-primary/20">
                           <ShieldCheck className="w-3 h-3" /> Optimal Stock
                         </span>
+                      )}
+                    </td>
+                    <td className="px-md py-sm">
+                      {prestockedIds.has(item.product_id) ? (
+                        <span className="text-emerald-400 font-bold text-[11px] font-mono flex items-center gap-1 bg-emerald-500/15 px-2 py-1 rounded-md border border-emerald-500/30">
+                          <CheckCircle2 className="w-3 h-3" /> Buffer Stocked
+                        </span>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            setPrestockingId(item.product_id);
+                            try {
+                              await handlePrestockFestival({
+                                product_id: item.product_id,
+                                festival_name: selectedFestival,
+                                suggested_qty: item.extra_units_needed || 600,
+                              });
+                              setPrestockedIds((prev) => new Set(prev).add(item.product_id));
+                            } finally {
+                              setPrestockingId(null);
+                            }
+                          }}
+                          disabled={prestockingId === item.product_id}
+                          className="bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold px-2.5 py-1 rounded-lg text-[11px] flex items-center gap-1 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                          title="Execute single-click pre-stocking for this festival surge"
+                        >
+                          {prestockingId === item.product_id ? (
+                            <RotateCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3 h-3" />
+                          )}
+                          <span>Pre-Stock (+{item.extra_units_needed || 600})</span>
+                        </button>
                       )}
                     </td>
                   </tr>

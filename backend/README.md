@@ -1,6 +1,6 @@
-# TransitOps Backend & System Guide
+# AstraChain Backend & System Guide
 
-Production-ready FastAPI backend for **TransitOps**, an Agentic AI platform for Supply Chain Intelligence & Demand Forecasting.
+Production-ready FastAPI backend for **AstraChain**, an Agentic AI platform for Supply Chain Intelligence & Demand Forecasting.
 
 ---
 
@@ -41,10 +41,10 @@ cp .env.example .env
 ```
 Ensure your `.env` contains:
 ```env
-PROJECT_NAME="TransitOps API"
+PROJECT_NAME="AstraChain API"
 VERSION="1.0.0"
-DATABASE_URL="sqlite:///./transitops.db" # Or "postgresql://user:password@localhost:5432/transitops"
-SECRET_KEY="transitops-super-secret-key-change-in-production"
+DATABASE_URL="sqlite:///./astrachain.db" # Or "postgresql://user:password@localhost:5432/astrachain"
+SECRET_KEY="astrachain-super-secret-key-change-in-production"
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_DAYS=7
 CORS_ORIGINS=["http://localhost:5173", "http://127.0.0.1:5173"]
