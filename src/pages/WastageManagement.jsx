@@ -78,9 +78,9 @@ export default function WastageManagement() {
 
       if (!matchesSearch) return false;
 
-      if (filterDecision === 'DISCOUNT') return d.decision === 'Apply Discount';
-      if (filterDecision === 'EXPIRED') return d.decision === 'Do Not Sell';
-      if (filterDecision === 'NORMAL') return d.decision === 'Sell Normally';
+      if (filterDecision === 'NEAR_EXPIRY') return d.days_remaining !== null && d.days_remaining <= 5 && d.days_remaining >= 0;
+      if (filterDecision === 'EXPIRED') return d.decision === 'Do Not Sell' || (d.days_remaining !== null && d.days_remaining < 0);
+      if (filterDecision === 'NORMAL') return d.days_remaining !== null && d.days_remaining > 5;
       return true;
     });
   }, [decisions, filterDecision, searchQuery]);
@@ -203,15 +203,15 @@ export default function WastageManagement() {
     );
   }
 
-  const discountItems = decisions.filter(d => d.decision === 'Apply Discount');
-  const expiredItems = decisions.filter(d => d.decision === 'Do Not Sell');
+  const nearExpiryItems = decisions.filter(d => d.days_remaining !== null && d.days_remaining <= 5 && d.days_remaining >= 0);
+  const expiredItems = decisions.filter(d => d.decision === 'Do Not Sell' || (d.days_remaining !== null && d.days_remaining < 0));
 
   const actionButtons = (
     <div className="flex items-center gap-xs flex-wrap">
       <button
         onClick={() => handleAddQuickSample()}
         className="bg-tertiary/15 hover:bg-tertiary/25 text-tertiary border border-tertiary/30 font-bold px-md py-sm rounded-lg text-label-md flex items-center gap-xs transition-all cursor-pointer"
-        title="Add a sample perishable item with dynamic discount calculation"
+        title="Add a sample perishable item to monitor expiry shelf-life"
       >
         <Sparkles className="w-4 h-4" />
         Quick Add Sample
@@ -231,7 +231,7 @@ export default function WastageManagement() {
       <div className="space-y-lg">
         <PageHeader
           title="Automation & Expiry Agent"
-          subtitle="Automates actions and reduces wastage by outputting dynamic discount alerts for near-expiry perishable items."
+          subtitle="Monitors perishable shelf life, detects near-expiry items, and flags batches requiring expedited transit or quarantine."
           actions={actionButtons}
         />
 
@@ -248,7 +248,7 @@ export default function WastageManagement() {
           </div>
           <h2 className="text-title-lg font-bold text-on-surface">No Wastage Analysis Available</h2>
           <p className="text-body-md text-on-surface-variant max-w-md">
-            Add near-to-expire items directly to run dynamic discount recommendations, or upload a dataset from Data Ingestion.
+            Add near-to-expire items directly to run shelf-life analysis, or upload a dataset from Data Ingestion.
           </p>
           <div className="flex items-center gap-md flex-wrap justify-center mt-md">
             <button
@@ -288,7 +288,7 @@ export default function WastageManagement() {
           <div className="flex items-center justify-between border-b border-outline-variant/60 pb-sm">
             <div className="flex items-center gap-xs text-primary font-bold text-title-md">
               <Clock className="w-5 h-5" />
-              <h3>Add Near-to-Expire Item & Discount</h3>
+              <h3>Add Near-to-Expire Item</h3>
             </div>
             <button
               onClick={() => setShowAddModal(false)}
@@ -299,7 +299,7 @@ export default function WastageManagement() {
           </div>
 
           <p className="text-body-sm text-on-surface-variant">
-            Enter item details below. The <strong>Wastage Agent</strong> will analyze shelf-life remaining and automatically calculate the corresponding dynamic promo discount.
+            Enter item details below. The <strong>Automation & Expiry Agent</strong> will track remaining shelf life and flag batches requiring expedited transit or quarantine.
           </p>
 
           <form onSubmit={handleAddNearExpirySubmit} className="space-y-sm">
@@ -432,23 +432,7 @@ export default function WastageManagement() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-label-sm text-on-surface-variant uppercase font-mono mb-1">
-                Discount Override (Optional)
-              </label>
-              <select
-                value={newItem.discount_override}
-                onChange={(e) => setNewItem({ ...newItem, discount_override: e.target.value })}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-md py-2 text-body-md text-on-surface focus:ring-1 focus:ring-primary focus:outline-none"
-              >
-                <option value="">Auto-Calculate by Wastage Agent Rules (Recommended)</option>
-                <option value="50% Dynamic Promo Discount">50% Dynamic Promo Discount</option>
-                <option value="40% Clearance Markdown">40% Clearance Markdown</option>
-                <option value="30% Dynamic Promo Discount">30% Dynamic Promo Discount</option>
-                <option value="20% Seasonal Markdown">20% Seasonal Markdown</option>
-                <option value="10% Early Burn Markdown">10% Early Burn Markdown</option>
-              </select>
-            </div>
+
 
             <div className="pt-md flex items-center justify-end gap-sm border-t border-outline-variant/60">
               <button
@@ -468,7 +452,7 @@ export default function WastageManagement() {
                 ) : (
                   <>
                     <Flame className="w-4 h-4" />
-                    Calculate & Add Item
+                    Add to Expiry Tracking
                   </>
                 )}
               </button>
@@ -483,7 +467,7 @@ export default function WastageManagement() {
     <div className="space-y-lg">
       <PageHeader
         title="Automation & Expiry Agent"
-        subtitle="Automates dynamic discount promo alerts for near-expiry products to minimize waste & maximize salvage value."
+        subtitle="Monitors perishable shelf life, detects near-expiry items, and flags batches requiring expedited transit or quarantine."
         actions={actionButtons}
       />
 
@@ -512,11 +496,11 @@ export default function WastageManagement() {
           icon={Tag}
         />
         <KPICard
-          title="Discount Alerts Triggered"
-          value={`${summary.discount_count || 0} Item Promos`}
-          status="positive"
-          subtitle="Automated clearance markdowns"
-          icon={DollarSign}
+          title="Near-Expiry Critical Batch"
+          value={String(nearExpiryItems.length || summary.near_expiry_count || 0)}
+          status={nearExpiryItems.length > 0 ? "warning" : "healthy"}
+          subtitle="Shelf life <= 5 days remaining"
+          icon={Flame}
         />
         <KPICard
           title="Expired Items"
@@ -530,7 +514,7 @@ export default function WastageManagement() {
       {summary.displayed_items > 0 && summary.near_expiry_count > decisions.length && (
         <div className="p-sm rounded-lg bg-primary/10 border border-primary/20 text-body-md text-primary">
           Showing the {decisions.length} most valuable near-expiry items of {summary.near_expiry_count.toLocaleString()} flagged.
-          Discounts: 50% (≤2 days) · 30% (≤5 days) · 20% (≤7 days) · 10% (≤10 days).
+          Shelf-life thresholds: Critical (≤2 days) · Urgent (≤5 days) · Safe (&gt;5 days).
         </div>
       )}
 
@@ -562,7 +546,7 @@ export default function WastageManagement() {
                 </span>
               </h3>
               <p className="text-body-sm text-on-surface-variant">
-                Visualizing Days Remaining to Expiry for individual item names to automate promo discount timing
+                Visualizing Days Remaining to Expiry for individual item names to monitor shelf-life and prevent spoilage
               </p>
             </div>
           </div>
@@ -620,71 +604,6 @@ export default function WastageManagement() {
         </div>
       </div>
 
-      {/* NEAR-EXPIRY DYNAMIC PROMO ITEM CARDS */}
-      {discountItems.length > 0 && (
-        <div className="glass-card rounded-xl p-lg space-y-md border border-tertiary/30">
-          <div className="flex items-center justify-between flex-wrap gap-xs">
-            <div className="flex items-center gap-xs text-tertiary">
-              <Zap className="w-5 h-5 text-tertiary" />
-              <h3 className="font-title-md text-title-md text-on-surface font-bold">Automated Dynamic Discount Alerts</h3>
-            </div>
-            <div className="flex items-center gap-sm">
-              <span className="font-label-sm text-on-surface-variant font-mono bg-surface-container-high px-sm py-1 rounded">
-                {discountItems.length} Active Item Promo Recommendations
-              </span>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="text-label-sm font-bold text-tertiary bg-tertiary/10 hover:bg-tertiary/20 px-sm py-1 rounded-lg border border-tertiary/30 transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add Item
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-md">
-            {discountItems.slice(0, 6).map((item, idx) => (
-              <div key={idx} className="p-md rounded-lg bg-surface-container-low border border-outline-variant space-y-xs flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-xs">
-                    <span className={`px-xs py-0.5 rounded font-label-sm font-bold ${
-                      item.days_remaining <= 2 ? 'bg-error/20 text-error border border-error/30' :
-                      item.days_remaining <= 4 ? 'bg-tertiary/20 text-tertiary border border-tertiary/30' :
-                      'bg-secondary/20 text-secondary'
-                    }`}>
-                      {item.days_remaining} Day(s) to Expiry
-                    </span>
-                    <span className="font-mono text-[11px] text-on-surface-variant">{item.product_id}</span>
-                  </div>
-
-                  <h4 className="font-bold text-on-surface text-body-md truncate">{item.product_name}</h4>
-                  {item.expiry_date && (
-                    <p className="font-label-sm text-on-surface-variant font-mono mt-0.5">Expires: {item.expiry_date}</p>
-                  )}
-
-                  <div className="p-xs rounded bg-tertiary/10 border border-tertiary/20 text-tertiary font-label-md font-bold mt-sm">
-                    Recommended: {item.discount} Discount
-                    {item.discounted_price != null && item.mrp != null && (
-                      <span className="block font-mono text-[11px] font-normal mt-0.5">
-                        MRP ₹{Number(item.mrp).toLocaleString()} → ₹{Number(item.discounted_price).toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleApplyDiscountAction(item)}
-                  className="w-full mt-md bg-tertiary/15 hover:bg-tertiary text-tertiary hover:text-on-tertiary font-bold py-1.5 px-md rounded-lg text-label-md transition-all border border-tertiary/30 flex items-center justify-center gap-xs cursor-pointer"
-                >
-                  <Flame className="w-3.5 h-3.5" />
-                  Apply Automated Markdown
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* EXPIRED ITEMS ALERT CARDS */}
       {expiredItems.length > 0 && (
         <div className="glass-card rounded-xl p-lg space-y-md border border-error/30">
@@ -732,12 +651,12 @@ export default function WastageManagement() {
                 All ({decisions.length})
               </button>
               <button
-                onClick={() => setFilterDecision('DISCOUNT')}
+                onClick={() => setFilterDecision('NEAR_EXPIRY')}
                 className={`px-sm py-xs font-label-sm text-label-sm rounded-md transition-all cursor-pointer ${
-                  filterDecision === 'DISCOUNT' ? 'bg-tertiary text-on-tertiary font-bold shadow' : 'text-tertiary'
+                  filterDecision === 'NEAR_EXPIRY' ? 'bg-tertiary text-on-tertiary font-bold shadow' : 'text-tertiary'
                 }`}
               >
-                Discount ({discountItems.length})
+                Near Expiry ({nearExpiryItems.length})
               </button>
               <button
                 onClick={() => setFilterDecision('EXPIRED')}
@@ -772,7 +691,7 @@ export default function WastageManagement() {
                 <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Expiry Date</th>
                 <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Days Remaining</th>
                 <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Decision</th>
-                <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Discount</th>
+                <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Expiry Urgency</th>
                 <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Reason & Agent Intervention</th>
               </tr>
             </thead>
@@ -811,10 +730,19 @@ export default function WastageManagement() {
                     <td className="px-lg py-md">
                       <StatusBadge status={getDecisionBadge(item.decision)} />
                     </td>
-                    <td className="px-lg py-md font-mono font-bold text-tertiary">
-                      {item.discount}
-                      {item.discounted_price != null && (
-                        <span className="block text-[11px] font-normal text-on-surface-variant">₹{Number(item.discounted_price).toLocaleString()}</span>
+                    <td className="px-lg py-md font-mono font-bold">
+                      {item.days_remaining !== null && item.days_remaining !== undefined ? (
+                        item.days_remaining <= 0 ? (
+                          <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-error/20 text-error border border-error/30">QUARANTINE</span>
+                        ) : item.days_remaining <= 2 ? (
+                          <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-error/15 text-error border border-error/25">CRITICAL (&lt;=2d)</span>
+                        ) : item.days_remaining <= 5 ? (
+                          <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-[#FF9800]/15 text-[#FF9800] border border-[#FF9800]/25">URGENT (&lt;=5d)</span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">SAFE (&gt;5d)</span>
+                        )
+                      ) : (
+                        <span className="text-on-surface-variant text-[11px]">NORMAL</span>
                       )}
                     </td>
                     <td className="px-lg py-md text-on-surface-variant max-w-xs truncate" title={item.reason}>

@@ -6,7 +6,7 @@ import { api } from '../api/client';
 import {
   TrendingUp, Cpu, Target, BarChart3, Database, UploadCloud,
   PartyPopper, CalendarDays, Sparkles, AlertTriangle, ShieldCheck, Flame, Zap,
-  SlidersHorizontal, CheckCircle2, Layers, Sparkle, ArrowRight
+  SlidersHorizontal, CheckCircle2, Layers, Sparkle, ArrowRight, RotateCw
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -37,6 +37,10 @@ function FestivalItemDemandPredictor() {
   const [selectedFestival, setSelectedFestival] = useState('Diwali');
   const [itemDemandData, setItemDemandData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [reorderingId, setReorderingId] = useState(null);
+  const [reorderedIds, setReorderedIds] = useState(new Set());
+  const [reorderingAll, setReorderingAll] = useState(false);
+  const [festivalToast, setFestivalToast] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -58,6 +62,14 @@ function FestivalItemDemandPredictor() {
 
   return (
     <div className="space-y-md">
+      {/* Success Reorder Toast */}
+      {festivalToast && (
+        <div className="p-md rounded-xl bg-primary/10 border border-primary/30 flex items-center gap-sm text-primary font-bold shadow-md animate-fade-in">
+          <CheckCircle2 className="w-5 h-5 shrink-0" />
+          <span>{festivalToast}</span>
+        </div>
+      )}
+
       {/* Header & Festival Selector */}
       <div className="flex items-center justify-between flex-wrap gap-sm bg-surface-container-low p-md rounded-xl border border-outline-variant/50 shadow-sm">
         <div className="flex items-center gap-xs">
@@ -159,9 +171,38 @@ function FestivalItemDemandPredictor() {
               Predicted High-Demand Items for {selectedFestival}
             </h4>
           </div>
-          <span className="text-label-sm font-mono text-on-surface-variant bg-surface-container-high px-sm py-0.5 rounded-full">
-            Window: {itemDemandData?.window_days || 7} Days around peak
-          </span>
+          <div className="flex items-center gap-xs">
+            <span className="text-label-sm font-mono text-on-surface-variant bg-surface-container-high px-sm py-0.5 rounded-full">
+              Window: {itemDemandData?.window_days || 7} Days around peak
+            </span>
+            <button
+              onClick={async () => {
+                if (!itemDemandData?.items?.length) return;
+                setReorderingAll(true);
+                try {
+                  for (const item of itemDemandData.items) {
+                    await api.prestockFestival({
+                      product_id: item.product_id,
+                      festival_name: selectedFestival,
+                      quantity: item.extra_units_needed || 600,
+                    });
+                  }
+                  setReorderedIds(new Set(itemDemandData.items.map(i => i.product_id)));
+                  setFestivalToast(`1-Click Festival Reorder: All ${itemDemandData.items.length} items reordered for ${selectedFestival}!`);
+                  setTimeout(() => setFestivalToast(null), 5000);
+                } catch (e) {
+                  console.error('Bulk festival reorder failed:', e);
+                } finally {
+                  setReorderingAll(false);
+                }
+              }}
+              disabled={reorderingAll || !itemDemandData?.items?.length}
+              className="bg-primary hover:bg-primary/90 active:scale-95 text-on-primary font-bold px-sm py-1 rounded-lg text-[11px] flex items-center gap-1 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+            >
+              {reorderingAll ? <RotateCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+              <span>{reorderingAll ? 'Reordering...' : `1-Click Reorder All ${selectedFestival} Buffers`}</span>
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -181,12 +222,13 @@ function FestivalItemDemandPredictor() {
                   <th className="px-md py-sm text-label-sm text-on-surface-variant uppercase font-mono">Festival Sales</th>
                   <th className="px-md py-sm text-label-sm text-on-surface-variant uppercase font-mono">Extra Buffer Needed</th>
                   <th className="px-md py-sm text-label-sm text-on-surface-variant uppercase font-mono">Stock Risk Status</th>
+                  <th className="px-md py-sm text-label-sm text-on-surface-variant uppercase font-mono">1-Click Festival Reorder</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/30 text-body-md">
                 {(!itemDemandData?.items || itemDemandData.items.length === 0) && (
                   <tr>
-                    <td colSpan={8} className="px-md py-lg text-center text-on-surface-variant italic">
+                    <td colSpan={9} className="px-md py-lg text-center text-on-surface-variant italic">
                       No demand predictions available for {selectedFestival}.
                     </td>
                   </tr>
@@ -234,6 +276,43 @@ function FestivalItemDemandPredictor() {
                         <span className="inline-flex items-center gap-1 px-xs py-0.5 rounded font-label-sm font-bold bg-primary/10 text-primary border border-primary/20">
                           <ShieldCheck className="w-3 h-3" /> Optimal Stock
                         </span>
+                      )}
+                    </td>
+                    <td className="px-md py-sm">
+                      {reorderedIds.has(item.product_id) ? (
+                        <span className="text-emerald-400 font-bold text-[11px] font-mono flex items-center gap-1 bg-emerald-500/15 px-2 py-1 rounded-md border border-emerald-500/30">
+                          <CheckCircle2 className="w-3 h-3" /> Reordered (+{item.extra_units_needed || 600})
+                        </span>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            setReorderingId(item.product_id);
+                            try {
+                              await api.prestockFestival({
+                                product_id: item.product_id,
+                                festival_name: selectedFestival,
+                                quantity: item.extra_units_needed || 600,
+                              });
+                              setReorderedIds((prev) => new Set(prev).add(item.product_id));
+                              setFestivalToast(`Reordered +${item.extra_units_needed || 600} units of ${item.product_name} for ${selectedFestival}!`);
+                              setTimeout(() => setFestivalToast(null), 4000);
+                            } catch (err) {
+                              console.error('Festival reorder failed:', err);
+                            } finally {
+                              setReorderingId(null);
+                            }
+                          }}
+                          disabled={reorderingId === item.product_id}
+                          className="bg-primary hover:bg-primary/90 active:scale-95 text-on-primary font-bold px-2.5 py-1 rounded-lg text-[11px] flex items-center gap-1 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                          title="1-Click Reorder festival buffer surge"
+                        >
+                          {reorderingId === item.product_id ? (
+                            <RotateCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Zap className="w-3 h-3" />
+                          )}
+                          <span>1-Click Reorder (+{item.extra_units_needed || 600})</span>
+                        </button>
                       )}
                     </td>
                   </tr>
