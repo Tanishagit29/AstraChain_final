@@ -56,7 +56,19 @@ class PipelineState:
         # (the decisions list only holds the highest-priority sample of a large dataset).
         self._wastage_offset: Dict[str, int] = {}
 
+        # LLM agent insights (Groq). Filled in the background AFTER the deterministic pipeline has finished,
+        # so a slow or failing LLM can never block or break the pipeline results.
+        self.agent_insights: Dict[str, Any] = {
+            "status": "idle",  # idle | running | completed | skipped | error
+            "message": "No pipeline has been run yet.",
+            "started_at": None,
+            "finished_at": None,
+            "agents": [],
+        }
+
         # Pipeline stage status
+        self.agent_traces: List[Dict[str, Any]] = []
+
         self.stages: Dict[str, str] = {
             "upload": "pending",
             "cleaning": "pending",
@@ -64,7 +76,7 @@ class PipelineState:
             "inventory": "pending",
             "wastage": "pending",
         }
-        self.agent_traces: List[Dict[str, Any]] = []
+
 
     def add_agent_trace(
         self,
@@ -89,7 +101,6 @@ class PipelineState:
         }
         self.agent_traces.append(trace)
 
-
     def start_pipeline(self):
         """Mark a new pipeline run starting."""
         self.dataset_id = str(uuid.uuid4())[:12]
@@ -97,6 +108,17 @@ class PipelineState:
         self.has_run = True
         for key in self.stages:
             self.stages[key] = "pending"
+        self.agent_insights = {
+            "status": "idle",
+            "message": "Pipeline running.",
+            "started_at": None,
+            "finished_at": None,
+            "agents": [],
+        }
+
+    def set_agent_insights(self, **fields: Any):
+        """Merge fields into the LLM agent-insights record (status/message/agents/timestamps)."""
+        self.agent_insights = {**self.agent_insights, **fields}
 
     def update_stage(self, stage: str, status: str):
         """Update a pipeline stage status: pending, running, completed, error."""
@@ -142,6 +164,45 @@ class PipelineState:
         self.inventory_analysis = inventory_analysis
         self.inventory_summary = inventory_summary
 
+    def restock_item(self, product_id: str, quantity: int = 500) -> Optional[Dict[str, Any]]:
+        """Restock an item in pipeline inventory_analysis, clearing its stockout status."""
+        for item in self.inventory_analysis:
+            pid = str(item.get("product_id", "")).strip().lower()
+            pname = str(item.get("product_name", "")).strip().lower()
+            target = str(product_id).strip().lower()
+            if pid == target or pname == target or target in pid or target in pname:
+                old_stock = int(item.get("current_stock", 0) or 0)
+                new_stock = old_stock + quantity
+                item["current_stock"] = new_stock
+                pred_demand = max(1, int(item.get("predicted_demand", 0) or 1))
+                new_ratio = round(new_stock / pred_demand, 2)
+                item["stock_ratio"] = new_ratio
+                item["status"] = "Optimal Stock" if new_ratio >= 0.7 else "Low Stock"
+                item["recommended_action"] = "Optimal level" if new_ratio >= 0.7 else "Minor reorder"
+                item["suggested_reorder_qty"] = 0
+                item["is_restocked"] = True
+                self._refresh_inventory_summary()
+                return item
+        return None
+
+    def _refresh_inventory_summary(self):
+        total = len(self.inventory_analysis)
+        if total == 0:
+            return
+        available = sum(1 for i in self.inventory_analysis if i.get("status") in ["Optimal Stock", "Healthy", "Available"])
+        low_stock = sum(1 for i in self.inventory_analysis if i.get("status") == "Low Stock")
+        stockouts = sum(1 for i in self.inventory_analysis if i.get("status") == "Stockout Risk")
+        overstock = sum(1 for i in self.inventory_analysis if i.get("status") == "Overstock")
+        healthy_pct = round((available / total) * 100, 1)
+        self.inventory_summary = {
+            "total_items": total,
+            "available_count": available,
+            "low_stock_count": low_stock,
+            "stockout_count": stockouts,
+            "overstock_count": overstock,
+            "healthy_pct": healthy_pct
+        }
+
     def set_wastage_results(
         self,
         wastage_decisions: List[Dict],
@@ -176,7 +237,6 @@ class PipelineState:
             "agent_traces": self.agent_traces,
         }
 
-
     def add_near_expiry_item(
         self,
         product_name: str,
@@ -185,7 +245,7 @@ class PipelineState:
         days_remaining: int = 3,
         expiry_date: Optional[str] = None,
         discount_override: Optional[str] = None,
-        unit_cost: str = "₹100",
+        unit_cost: str = "â‚¹100",
         current_stock: int = 100,
         warehouse: str = "Main Terminal"
     ) -> Dict[str, Any]:
@@ -285,15 +345,15 @@ class PipelineState:
         """Populate the initial Wastage Agent view: a few curated near-expiry items plus the Rio Mart near-expiry items."""
         # 1. Curated core perishable items (all still sellable - none are expired)
         default_items = [
-            {"product_name": "Amul Taaza Toned Milk 1L", "product_id": "SKU-MILK-101", "category": "Dairy & Refrigerated", "days_remaining": 1, "unit_cost": "₹72", "current_stock": 120},
-            {"product_name": "Organic Greek Yogurt 500g", "product_id": "SKU-YOG-204", "category": "Dairy & Refrigerated", "days_remaining": 2, "unit_cost": "₹150", "current_stock": 85},
-            {"product_name": "Fresh Strawberries 250g", "product_id": "SKU-STR-308", "category": "Fresh Produce", "days_remaining": 3, "unit_cost": "₹199", "current_stock": 45},
-            {"product_name": "Artisanal Sourdough Bread", "product_id": "SKU-BRD-412", "category": "Bakery & Bread", "days_remaining": 4, "unit_cost": "₹110", "current_stock": 35},
-            {"product_name": "Fresh Malai Paneer 200g", "product_id": "SKU-PNR-515", "category": "Dairy & Refrigerated", "days_remaining": 5, "unit_cost": "₹95", "current_stock": 90},
-            {"product_name": "Free Range Eggs (Pack of 6)", "product_id": "SKU-EGG-618", "category": "Poultry & Meat", "days_remaining": 6, "unit_cost": "₹65", "current_stock": 110},
-            {"product_name": "Alphonso Mangoes Premium 1kg", "product_id": "SKU-MNG-721", "category": "Fresh Produce", "days_remaining": 7, "unit_cost": "₹450", "current_stock": 60},
-            {"product_name": "Tender Coconut Water 200ml", "product_id": "SKU-BEV-825", "category": "Beverages", "days_remaining": 9, "unit_cost": "₹40", "current_stock": 140},
-            {"product_name": "Fresh Pasteurised Cream 250ml", "product_id": "SKU-CRM-930", "category": "Dairy & Refrigerated", "days_remaining": 1, "unit_cost": "₹85", "current_stock": 15},
+            {"product_name": "Amul Taaza Toned Milk 1L", "product_id": "SKU-MILK-101", "category": "Dairy & Refrigerated", "days_remaining": 1, "unit_cost": "â‚¹72", "current_stock": 120},
+            {"product_name": "Organic Greek Yogurt 500g", "product_id": "SKU-YOG-204", "category": "Dairy & Refrigerated", "days_remaining": 2, "unit_cost": "â‚¹150", "current_stock": 85},
+            {"product_name": "Fresh Strawberries 250g", "product_id": "SKU-STR-308", "category": "Fresh Produce", "days_remaining": 3, "unit_cost": "â‚¹199", "current_stock": 45},
+            {"product_name": "Artisanal Sourdough Bread", "product_id": "SKU-BRD-412", "category": "Bakery & Bread", "days_remaining": 4, "unit_cost": "â‚¹110", "current_stock": 35},
+            {"product_name": "Fresh Malai Paneer 200g", "product_id": "SKU-PNR-515", "category": "Dairy & Refrigerated", "days_remaining": 5, "unit_cost": "â‚¹95", "current_stock": 90},
+            {"product_name": "Free Range Eggs (Pack of 6)", "product_id": "SKU-EGG-618", "category": "Poultry & Meat", "days_remaining": 6, "unit_cost": "â‚¹65", "current_stock": 110},
+            {"product_name": "Alphonso Mangoes Premium 1kg", "product_id": "SKU-MNG-721", "category": "Fresh Produce", "days_remaining": 7, "unit_cost": "â‚¹450", "current_stock": 60},
+            {"product_name": "Tender Coconut Water 200ml", "product_id": "SKU-BEV-825", "category": "Beverages", "days_remaining": 9, "unit_cost": "â‚¹40", "current_stock": 140},
+            {"product_name": "Fresh Pasteurised Cream 250ml", "product_id": "SKU-CRM-930", "category": "Dairy & Refrigerated", "days_remaining": 1, "unit_cost": "â‚¹85", "current_stock": 15},
         ]
         for item in default_items:
             self.add_near_expiry_item(**item)
@@ -340,10 +400,10 @@ class PipelineState:
             "stages": self.stages,
             "available_fields": self.available_fields,
             "missing_field_warnings": self.missing_field_warnings,
-            "expiry_available": self.expiry_available,
             "agent_traces": self.agent_traces,
+            "expiry_available": self.expiry_available,
+            "agent_insights_status": self.agent_insights.get("status"),
         }
-
 
 
 # Module-level singleton instance
