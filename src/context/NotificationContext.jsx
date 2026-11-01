@@ -11,6 +11,7 @@ export function NotificationProvider({ children }) {
     wastage_count: 0,
     festival_count: 0,
     restocked_count: 0,
+    route_count: 0,
     total: 0,
   });
   const [loading, setLoading] = useState(false);
@@ -169,6 +170,7 @@ export function NotificationProvider({ children }) {
           wastage_count: res.wastage_count || 0,
           festival_count: res.festival_count || 0,
           restocked_count: res.restocked_count || 0,
+          route_count: res.route_count || 0,
           total: res.total || res.data.length,
         });
       }
@@ -185,7 +187,7 @@ export function NotificationProvider({ children }) {
     if (!notification) return;
 
     // 1. Play auditory chime
-    if (event === 'RESTOCK_COMPLETED' || event === 'FESTIVAL_PRESTOCKED' || event === 'WASTAGE_MITIGATED') {
+    if (event === 'RESTOCK_COMPLETED' || event === 'FESTIVAL_PRESTOCKED' || event === 'WASTAGE_MITIGATED' || event === 'ROUTE_ARRIVAL') {
       playChime('success');
     } else if (event === 'FESTIVAL_ALERT') {
       playChime('festival');
@@ -232,6 +234,7 @@ export function NotificationProvider({ children }) {
         wastage_count: type === 'WASTAGE' ? prev.wastage_count + 1 : prev.wastage_count,
         festival_count: type === 'FESTIVAL' ? prev.festival_count + 1 : prev.festival_count,
         restocked_count: type === 'RESTOCKED' ? prev.restocked_count + 1 : prev.restocked_count,
+        route_count: (type === 'ROUTE_ARRIVAL' || type === 'ROUTE') ? prev.route_count + 1 : prev.route_count,
         total: prev.total + 1,
       };
     });

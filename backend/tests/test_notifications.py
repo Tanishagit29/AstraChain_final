@@ -79,3 +79,36 @@ def test_inventory_restock_endpoint(client):
     data = res.json()
     assert data["success"] is True
     assert data["data"]["quantity"] == 300
+
+
+def test_route_arrival_notification(client):
+    res = client.post(
+        "/api/notifications/route/arrival",
+        json={
+            "truck_id": "MH-04-JK-4821",
+            "origin": "Mumbai Central Port",
+            "destination": "Pune Logistics Hub",
+            "fuel_saved": 14.2,
+            "co2_saved": 38.0
+        }
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert "Items Reached" in data["notification"]["title"]
+    assert data["notification"]["type"] == "ROUTE_ARRIVAL"
+
+    # Verify route notification appears in feed
+    feed_res = client.get("/api/notifications")
+    assert feed_res.status_code == 200
+    feed_data = feed_res.json()
+    assert "route_count" in feed_data
+    assert feed_data["route_count"] >= 1
+
+
+def test_simulate_all_alert_types(client):
+    types = ["stockout", "restock", "expiry", "festival", "route"]
+    for atype in types:
+        res = client.post("/api/notifications/simulate", json={"type": atype})
+        assert res.status_code == 200
+        assert res.json()["success"] is True

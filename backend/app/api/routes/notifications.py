@@ -65,6 +65,7 @@ manager = NotificationConnectionManager()
 def get_local_ip() -> str:
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.2)
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
         s.close()
@@ -113,24 +114,27 @@ async def dispatch_phone_push(title: str, message: str, alert_type: str, product
     if not topic:
         return
 
-    priority = "urgent" if "STOCKOUT" in atype or "WASTAGE" in atype else ("high" if "FESTIVAL" in atype else "default")
-    tags = "warning,rotating_light" if "STOCKOUT" in atype else ("package,white_check_mark" if "RESTOCK" in atype else ("apple,warning" if "WASTAGE" in atype else "party_popper,sparkles"))
+    app_url = f"http://{LOCAL_IP}:5173"
+    if "ROUTE" in atype or "ARRIVAL" in atype:
+        priority = "high"
+        tags = "truck,checkered_flag"
+        actions = [f"view, Track Route, {app_url}/routes"]
+    else:
+        priority = "urgent" if "STOCKOUT" in atype or "WASTAGE" in atype else ("high" if "FESTIVAL" in atype else "default")
+        tags = "warning,rotating_light" if "STOCKOUT" in atype else ("package,white_check_mark" if "RESTOCK" in atype else ("apple,warning" if "WASTAGE" in atype else "party_popper,sparkles"))
+        actions = [f"view, Open Dashboard, {app_url}"]
+        if product_id and "STOCKOUT" in atype:
+            actions.insert(0, f"view, 1-Click Reorder, {app_url}/inventory")
+        elif product_id and "WASTAGE" in atype:
+            actions.insert(0, f"view, Expiry Monitoring, {app_url}/wastage")
+        elif product_id and "FESTIVAL" in atype:
+            actions.insert(0, f"view, 1-Click Festival Reorder, {app_url}/demand-forecast?mode=festival")
 
     headers = {
         "Title": title,
         "Priority": priority,
         "Tags": tags,
     }
-
-    # Action buttons right on phone notification
-    app_url = f"http://{LOCAL_IP}:5173"
-    actions = [f"view, Open Dashboard, {app_url}"]
-    if product_id and "STOCKOUT" in atype:
-        actions.insert(0, f"view, 1-Click Restock, {app_url}/inventory")
-    elif product_id and "WASTAGE" in atype:
-        actions.insert(0, f"view, 1-Click Markdown, {app_url}/wastage")
-    elif product_id and "FESTIVAL" in atype:
-        actions.insert(0, f"view, 1-Click Pre-Stock, {app_url}/forecast")
 
     headers["Actions"] = "; ".join(actions)
 
@@ -178,7 +182,7 @@ async def broadcast_live_event(event_type: str, notification: Dict[str, Any], ex
             ntype = notification.get("type") or event_type
             pid = notification.get("product_id")
             qty = notification.get("suggested_qty") or notification.get("quantity_added")
-            await dispatch_phone_push(title, msg, ntype, pid, qty)
+            asyncio.create_task(dispatch_phone_push(title, msg, ntype, pid, qty))
         except Exception as err:
             logger.warning(f"Background phone push skipped: {err}")
 
@@ -206,13 +210,24 @@ class FestivalPrestockRequest(BaseModel):
     notification_id: Optional[str] = None
 
 
+class RouteArrivalRequest(BaseModel):
+    truck_id: Optional[str] = "MH-04-JK-4821"
+    origin: Optional[str] = "Mumbai Central Port"
+    destination: Optional[str] = "Pune Logistics Hub"
+    fuel_saved: Optional[float] = 14.2
+    co2_saved: Optional[float] = 38.0
+
+
 class SimulateAlertRequest(BaseModel):
-    type: str = "stockout"  # stockout, restock, wastage, festival, random
+    type: str = "stockout"  # stockout, restock, wastage/expiry, festival, route/arrival
     product_name: Optional[str] = None
     product_id: Optional[str] = None
     festival_name: Optional[str] = None
     quantity: Optional[int] = None
     days_remaining: Optional[int] = None
+    truck_id: Optional[str] = None
+    origin: Optional[str] = None
+    destination: Optional[str] = None
 
 
 class PhoneConfigUpdate(BaseModel):
@@ -642,6 +657,7 @@ def get_manager_notifications(
     wastage_count = sum(1 for n in notifications if n["type"] == "WASTAGE" and not n.get("is_mitigated"))
     festival_count = sum(1 for n in notifications if n["type"] == "FESTIVAL" and not n.get("is_prestocked"))
     restocked_count = sum(1 for n in notifications if n["type"] == "RESTOCKED" or n.get("is_restocked"))
+    route_count = sum(1 for n in notifications if n.get("type") in ("ROUTE_ARRIVAL", "ROUTE"))
     unread_count = sum(1 for n in notifications if not n["is_read"])
 
     if unread_only:
@@ -654,6 +670,7 @@ def get_manager_notifications(
         "wastage_count": wastage_count,
         "festival_count": festival_count,
         "restocked_count": restocked_count,
+        "route_count": route_count,
         "total": len(notifications),
         "data": notifications
     }
@@ -917,6 +934,61 @@ async def prestock_festival_recommendation(
 # =============================================================================
 # Live Alert Simulation Engine (for testing & interactive demo)
 # =============================================================================
+@router.post("/route/arrival")
+async def broadcast_route_arrival(
+    payload: RouteArrivalRequest,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Broadcasts a real-time Route Reached / Delivery Completed notification
+    when items reach their destination warehouse or retail outlet.
+    """
+    truck = payload.truck_id or "MH-04-JK-4821"
+    dest = payload.destination or "Pune Logistics Hub"
+    origin = payload.origin or "Mumbai Central Port"
+    fuel = payload.fuel_saved or 14.2
+    co2 = payload.co2_saved or 38.0
+    notif_id = f"route-arr-{uuid.uuid4().hex[:8]}"
+
+    live_notif = {
+        "id": notif_id,
+        "title": f"Items Reached: {truck} Arrived at {dest}",
+        "message": f"Delivery completed! Truck {truck} safely arrived at {dest} from {origin}. 100% of items reached destination. Efficiency: {fuel}L fuel saved, {co2}kg CO2 avoided.",
+        "type": "ROUTE_ARRIVAL",
+        "severity": "SUCCESS",
+        "truck_id": truck,
+        "origin": origin,
+        "destination": dest,
+        "fuel_saved": fuel,
+        "co2_saved": co2,
+        "items_delivered": True,
+        "can_view_route": True,
+        "is_read": False,
+        "timestamp": "Just now",
+        "badge": "Items Reached"
+    }
+    SIMULATED_NOTIFICATIONS.insert(0, live_notif)
+    await broadcast_live_event("ROUTE_ARRIVAL", live_notif, {"truck_id": truck, "destination": dest})
+
+    try:
+        db_notif = Notification(
+            title=live_notif["title"],
+            message=live_notif["message"],
+            type="SUCCESS",
+            is_read=False
+        )
+        db.add(db_notif)
+        db.commit()
+    except Exception as e:
+        logger.warning(f"Failed to record route arrival in DB: {e}")
+
+    return {
+        "success": True,
+        "message": f"Route arrival broadcasted for truck {truck} reaching {dest}",
+        "notification": live_notif
+    }
+
+
 @router.post("/simulate")
 async def simulate_live_notification(
     payload: SimulateAlertRequest,
@@ -982,32 +1054,56 @@ async def simulate_live_notification(
         }
         event_name = "RESTOCK_COMPLETED"
 
-    elif alert_type == "wastage":
-        pid = payload.product_id or f"SKU-WST-{uuid.uuid4().hex[:4].upper()}"
+    elif alert_type in ("wastage", "expiry"):
+        pid = payload.product_id or f"SKU-EXP-{uuid.uuid4().hex[:4].upper()}"
         pname = payload.product_name or "Fresh Malai Paneer 200g"
         days_rem = payload.days_remaining if payload.days_remaining is not None else 2
         stk = payload.quantity or 95
-        disc = "50% Dynamic Promo Markdown" if days_rem <= 2 else "30% Dynamic Markdown"
 
         generated_notif = {
             "id": notif_id,
-            "title": f"Wastage Alert: {pname}",
-            "message": f"Perishable shelf-life warning: {stk} units approaching expiry in {days_rem} day{'s' if days_rem != 1 else ''} at Cold Facility. Recommended: {disc} for rapid inventory clearance.",
+            "title": f"Expiry Alert: {pname}",
+            "message": f"Perishable shelf-life warning: {stk} units expiring in {days_rem} day{'s' if days_rem != 1 else ''} at Cold Facility. Expedited transit reroute or quarantine recommended.",
             "type": "WASTAGE",
             "severity": "CRITICAL" if days_rem <= 2 else "WARNING",
             "product_id": pid,
             "product_name": pname,
             "current_stock": stk,
             "days_remaining": days_rem,
-            "discount_recommended": disc,
             "warehouse": "Main Cold Chain Hub",
             "can_mitigate": True,
             "is_mitigated": False,
             "is_read": False,
             "timestamp": f"{days_rem}d to Expiry",
-            "badge": "1-Click Markdown"
+            "badge": "1-Click Expedited Transit"
         }
         event_name = "WASTAGE_ALERT"
+
+    elif alert_type in ("route", "arrival", "delivery", "reached"):
+        truck = payload.truck_id or "MH-04-JK-4821"
+        dest = payload.destination or "Pune Logistics Hub"
+        origin = payload.origin or "Mumbai Central Port"
+        fuel = 14.2
+        co2 = 38.0
+
+        generated_notif = {
+            "id": notif_id,
+            "title": f"Items Reached: {truck} Arrived at {dest}",
+            "message": f"Delivery completed! Truck {truck} safely arrived at {dest} from {origin}. 100% of items reached destination. Efficiency: {fuel}L fuel saved, {co2}kg CO2 avoided.",
+            "type": "ROUTE_ARRIVAL",
+            "severity": "SUCCESS",
+            "truck_id": truck,
+            "origin": origin,
+            "destination": dest,
+            "fuel_saved": fuel,
+            "co2_saved": co2,
+            "items_delivered": True,
+            "can_view_route": True,
+            "is_read": False,
+            "timestamp": "Just now",
+            "badge": "Items Reached"
+        }
+        event_name = "ROUTE_ARRIVAL"
 
     elif alert_type == "festival":
         fest = payload.festival_name or "Diwali"

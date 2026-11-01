@@ -290,6 +290,16 @@ export default function LiveRouteMap({
       setProgress((prev) => {
         const step = 0.0025 * simSpeed;
         const next = prev + step;
+        if (prev < 0.985 && next >= 0.985) {
+          // Trigger delivery arrival notification
+          api.notifyRouteArrival({
+            truck_id: activeVehicle?.truckId || 'MH-04-JK-4821',
+            origin: activeVehicle?.origin || 'Mumbai Central Port',
+            destination: (activeVehicle?.stops && activeVehicle.stops[0]) || 'Pune Logistics Hub',
+            fuel_saved: 14.2,
+            co2_saved: 38.0,
+          }).catch(() => {});
+        }
         return next > 1 ? 0 : next;
       });
     }, 50);
@@ -1203,6 +1213,26 @@ export default function LiveRouteMap({
             className="w-24 sm:w-36 accent-primary cursor-pointer"
             title="Scrub truck route progress"
           />
+          <button
+            onClick={async () => {
+              try {
+                await api.notifyRouteArrival({
+                  truck_id: activeVehicle?.truckId || 'MH-04-JK-4821',
+                  origin: activeVehicle?.origin || 'Mumbai Central Port',
+                  destination: (activeVehicle?.stops && activeVehicle.stops[0]) || 'Pune Logistics Hub',
+                  fuel_saved: 14.2,
+                  co2_saved: 38.0,
+                });
+              } catch (e) {
+                console.warn('Arrival broadcast err:', e);
+              }
+            }}
+            className="bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-400 border border-cyan-500/30 font-bold px-2 py-0.5 rounded text-[10px] font-mono flex items-center gap-1 transition-all cursor-pointer"
+            title="Broadcast arrival notification to manager hub & mobile phone"
+          >
+            <BellRing className="w-3 h-3" />
+            <span>Items Reached</span>
+          </button>
         </div>
 
         {/* Legend */}

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  AlertTriangle, CheckCircle2, Zap, Clock, Sparkles, X, ChevronRight, RotateCw, Volume2, VolumeX
+  AlertTriangle, CheckCircle2, Zap, Clock, Sparkles, X, ChevronRight, RotateCw, Volume2, VolumeX, Truck
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useLiveNotifications } from '../context/NotificationContext';
 
 function ToastCard({ toast, onDismiss, onRestock, onMitigateWastage, onPrestockFestival }) {
   const [actionLoading, setActionLoading] = useState(false);
   const [progress, setProgress] = useState(100);
+  const navigate = useNavigate();
 
   const duration = toast.duration || 7000;
 
@@ -28,7 +30,8 @@ function ToastCard({ toast, onDismiss, onRestock, onMitigateWastage, onPrestockF
   const isStockout = toast.type === 'STOCKOUT';
   const isWastage = toast.type === 'WASTAGE';
   const isFestival = toast.type === 'FESTIVAL';
-  const isRestocked = toast.type === 'RESTOCKED' || toast.severity === 'SUCCESS' || toast.is_restocked;
+  const isRoute = toast.type === 'ROUTE_ARRIVAL' || toast.type === 'ROUTE';
+  const isRestocked = toast.type === 'RESTOCKED' || (toast.severity === 'SUCCESS' && !isRoute) || toast.is_restocked;
 
   const handleAction = async (e) => {
     e.stopPropagation();
@@ -86,6 +89,16 @@ function ToastCard({ toast, onDismiss, onRestock, onMitigateWastage, onPrestockF
       progress: 'bg-purple-500',
       icon: <Sparkles className="w-5 h-5" />,
       badgeText: `${toast.festival_name || 'Festive'} Demand Surge`,
+    };
+  } else if (isRoute) {
+    theme = {
+      border: 'border-cyan-500/50 shadow-cyan-500/10',
+      bg: 'bg-surface/95',
+      badgeBg: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+      iconBg: 'bg-cyan-500/20 text-cyan-400',
+      progress: 'bg-cyan-500',
+      icon: <Truck className="w-5 h-5 text-cyan-400" />,
+      badgeText: 'Items Reached Destination',
     };
   } else if (isRestocked || toast.is_mitigated || toast.is_prestocked) {
     theme = {
@@ -168,7 +181,7 @@ function ToastCard({ toast, onDismiss, onRestock, onMitigateWastage, onPrestockF
           className="w-full bg-error hover:bg-error/90 active:scale-[0.98] text-on-error font-bold py-2 px-3 rounded-xl text-label-sm flex items-center justify-center gap-1.5 shadow-lg shadow-error/25 transition-all cursor-pointer disabled:opacity-60"
         >
           {actionLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-          <span>1-Click Restock (+{toast.suggested_qty || 500} units)</span>
+          <span>1-Click Reorder (+{toast.suggested_qty || 500} units)</span>
         </button>
       )}
 
@@ -179,7 +192,7 @@ function ToastCard({ toast, onDismiss, onRestock, onMitigateWastage, onPrestockF
           className="w-full bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-slate-950 font-bold py-2 px-3 rounded-xl text-label-sm flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/25 transition-all cursor-pointer disabled:opacity-60"
         >
           {actionLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
-          <span>1-Click Dynamic Markdown ({toast.discount_recommended || '30% Off'})</span>
+          <span>1-Click Expedited Transit</span>
         </button>
       )}
 
@@ -190,7 +203,21 @@ function ToastCard({ toast, onDismiss, onRestock, onMitigateWastage, onPrestockF
           className="w-full bg-purple-600 hover:bg-purple-500 active:scale-[0.98] text-white font-bold py-2 px-3 rounded-xl text-label-sm flex items-center justify-center gap-1.5 shadow-lg shadow-purple-600/25 transition-all cursor-pointer disabled:opacity-60"
         >
           {actionLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          <span>1-Click Pre-Stock Buffer (+{toast.suggested_qty || 600} units)</span>
+          <span>1-Click Festival Reorder (+{toast.suggested_qty || 600} units)</span>
+        </button>
+      )}
+
+      {isRoute && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate('/routes');
+            onDismiss(toast.id);
+          }}
+          className="w-full bg-cyan-500 hover:bg-cyan-400 active:scale-[0.98] text-slate-950 font-bold py-2 px-3 rounded-xl text-label-sm flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-500/25 transition-all cursor-pointer"
+        >
+          <Truck className="w-4 h-4" />
+          <span>View Route & Live Telemetry</span>
         </button>
       )}
 

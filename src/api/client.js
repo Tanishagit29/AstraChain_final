@@ -225,6 +225,13 @@ export const api = {
     });
   },
 
+  notifyRouteArrival: async ({ truck_id = 'MH-04-JK-4821', origin = 'Mumbai Central Port', destination = 'Pune Logistics Hub', fuel_saved = 14.2, co2_saved = 38.0 } = {}) => {
+    return await apiRequest('/notifications/route/arrival', {
+      method: 'POST',
+      body: JSON.stringify({ truck_id, origin, destination, fuel_saved, co2_saved }),
+    });
+  },
+
   prestockFestival: async ({ product_id, festival_name = 'Diwali', quantity = 500, notification_id = null }) => {
     return await apiRequest('/notifications/festival/prestock', {
       method: 'POST',

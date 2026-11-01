@@ -3,8 +3,9 @@ import {
   Bell, AlertTriangle, CheckCircle2, RotateCw, CheckCheck, 
   Zap, Package, ShieldAlert, Sparkles, X, ChevronRight, Info,
   Clock, Flame, Gift, Volume2, VolumeX, Trash2, Search, Play,
-  Smartphone
+  Smartphone, Truck
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useLiveNotifications } from '../context/NotificationContext';
 import PhoneIntegrationModal from './PhoneIntegrationModal';
 
@@ -15,6 +16,7 @@ export default function NotificationDropdown({ onRestockComplete }) {
   const [actionInProgress, setActionInProgress] = useState({});
   const [showSimMenu, setShowSimMenu] = useState(false);
   const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const navigate = useNavigate();
 
   const dropdownRef = useRef(null);
 
@@ -99,6 +101,8 @@ export default function NotificationDropdown({ onRestockComplete }) {
       if (n.type !== 'FESTIVAL') return false;
     } else if (filter === 'RESTOCKED') {
       if (n.type !== 'RESTOCKED' && !n.is_restocked && n.severity !== 'SUCCESS') return false;
+    } else if (filter === 'ROUTE') {
+      if (n.type !== 'ROUTE_ARRIVAL' && n.type !== 'ROUTE') return false;
     }
 
     // Keyword Search
@@ -240,11 +244,11 @@ export default function NotificationDropdown({ onRestockComplete }) {
                 + Restock
               </button>
               <button
-                onClick={() => onSimulateClick('wastage')}
+                onClick={() => onSimulateClick('expiry')}
                 className="bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 font-bold px-2 py-0.5 rounded-md transition-all cursor-pointer"
-                title="Simulate near-expiry perishable wastage alert"
+                title="Simulate near-expiry perishable alert"
               >
-                + Wastage
+                + Expiry
               </button>
               <button
                 onClick={() => onSimulateClick('festival')}
@@ -252,6 +256,13 @@ export default function NotificationDropdown({ onRestockComplete }) {
                 title="Simulate festival demand surge recommendation"
               >
                 + Festival
+              </button>
+              <button
+                onClick={() => onSimulateClick('route')}
+                className="bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-400 border border-cyan-500/30 font-bold px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1"
+                title="Simulate truck delivery completion & items reached destination"
+              >
+                <Truck className="w-3 h-3" /> + Route Arrival
               </button>
             </div>
           </div>
@@ -300,17 +311,6 @@ export default function NotificationDropdown({ onRestockComplete }) {
               Stockouts ({counts.stockout_count})
             </button>
             <button
-              onClick={() => setFilter('WASTAGE')}
-              className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer shrink-0 ${
-                filter === 'WASTAGE'
-                  ? 'bg-amber-500 text-slate-950 font-bold shadow'
-                  : 'text-amber-400 hover:bg-amber-500/10'
-              }`}
-            >
-              <Clock className="w-3 h-3" />
-              Wastage ({counts.wastage_count})
-            </button>
-            <button
               onClick={() => setFilter('FESTIVAL')}
               className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer shrink-0 ${
                 filter === 'FESTIVAL'
@@ -320,6 +320,28 @@ export default function NotificationDropdown({ onRestockComplete }) {
             >
               <Sparkles className="w-3 h-3" />
               Festival ({counts.festival_count})
+            </button>
+            <button
+              onClick={() => setFilter('WASTAGE')}
+              className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer shrink-0 ${
+                filter === 'WASTAGE'
+                  ? 'bg-amber-500 text-slate-950 font-bold shadow'
+                  : 'text-amber-400 hover:bg-amber-500/10'
+              }`}
+            >
+              <Clock className="w-3 h-3" />
+              Expiry ({counts.wastage_count})
+            </button>
+            <button
+              onClick={() => setFilter('ROUTE')}
+              className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer shrink-0 ${
+                filter === 'ROUTE'
+                  ? 'bg-cyan-500 text-slate-950 font-bold shadow'
+                  : 'text-cyan-400 hover:bg-cyan-500/10'
+              }`}
+            >
+              <Truck className="w-3 h-3" />
+              Route Reached ({counts.route_count || 0})
             </button>
             <button
               onClick={() => setFilter('RESTOCKED')}
@@ -351,7 +373,8 @@ export default function NotificationDropdown({ onRestockComplete }) {
                 const isStockout = n.type === 'STOCKOUT';
                 const isWastage = n.type === 'WASTAGE';
                 const isFestival = n.type === 'FESTIVAL';
-                const isRestocked = n.type === 'RESTOCKED' || n.is_restocked || n.severity === 'SUCCESS';
+                const isRoute = n.type === 'ROUTE_ARRIVAL' || n.type === 'ROUTE';
+                const isRestocked = n.type === 'RESTOCKED' || n.is_restocked || (n.severity === 'SUCCESS' && !isRoute);
                 const isBusy = actionInProgress[n.id];
 
                 // Badge and accent styling
@@ -371,6 +394,10 @@ export default function NotificationDropdown({ onRestockComplete }) {
                   borderStyle = 'border-l-4 border-l-purple-500 bg-purple-500/5';
                   iconEl = <Sparkles className="w-4 h-4 text-purple-300" />;
                   iconBg = 'bg-purple-500/20 border-purple-500/30 text-purple-300';
+                } else if (isRoute) {
+                  borderStyle = 'border-l-4 border-l-cyan-500 bg-cyan-500/5';
+                  iconEl = <Truck className="w-4 h-4 text-cyan-400" />;
+                  iconBg = 'bg-cyan-500/20 border-cyan-500/30 text-cyan-400';
                 } else if (isRestocked || n.is_mitigated || n.is_prestocked) {
                   borderStyle = 'border-l-4 border-l-emerald-500 bg-emerald-500/5';
                   iconEl = <CheckCircle2 className="w-4 h-4 text-emerald-400" />;
@@ -473,6 +500,23 @@ export default function NotificationDropdown({ onRestockComplete }) {
                               +{n.quantity_added?.toLocaleString()} units replenished
                             </span>
                           )}
+                          {isRoute && (
+                            <>
+                              <span className="bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded font-bold">
+                                {n.truck_id || 'MH-04-JK-4821'}
+                              </span>
+                              {n.destination && (
+                                <span className="bg-surface-container-high px-1.5 py-0.5 rounded text-on-surface-variant border border-outline-variant">
+                                  {n.origin} → {n.destination}
+                                </span>
+                              )}
+                              {n.fuel_saved && (
+                                <span className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold">
+                                  {n.fuel_saved}L Fuel Saved
+                                </span>
+                              )}
+                            </>
+                          )}
                         </div>
 
                         {/* Interactive 1-Click Action Buttons */}
@@ -486,7 +530,7 @@ export default function NotificationDropdown({ onRestockComplete }) {
                                 className="bg-error hover:bg-error/90 active:scale-95 text-on-error font-bold px-3 py-1.5 rounded-lg text-label-sm flex items-center gap-1.5 shadow-md shadow-error/20 transition-all cursor-pointer disabled:opacity-50"
                               >
                                 {isBusy ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                                <span>1-Click Restock (+{n.suggested_qty || 500} units)</span>
+                                <span>1-Click Reorder (+{n.suggested_qty || 500} units)</span>
                               </button>
                             ) : (
                               <span className="text-emerald-400 font-bold text-[11px] font-mono flex items-center gap-1 bg-emerald-500/15 px-2 py-1 rounded-md border border-emerald-500/30">
@@ -505,7 +549,7 @@ export default function NotificationDropdown({ onRestockComplete }) {
                                 className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-label-sm flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
                               >
                                 {isBusy ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
-                                <span>1-Click Apply Markdown ({n.discount_recommended || '30% Off'})</span>
+                                <span>1-Click Expedited Transit</span>
                               </button>
                             ) : (
                               <span className="text-emerald-400 font-bold text-[11px] font-mono flex items-center gap-1 bg-emerald-500/15 px-2 py-1 rounded-md border border-emerald-500/30">
@@ -513,6 +557,21 @@ export default function NotificationDropdown({ onRestockComplete }) {
                                 Markdown Active
                               </span>
                             )
+                          )}
+
+                          {/* Route Arrival View Action Button */}
+                          {isRoute && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate('/routes');
+                                setIsOpen(false);
+                              }}
+                              className="bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-label-sm flex items-center gap-1.5 shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
+                            >
+                              <Truck className="w-3.5 h-3.5" />
+                              <span>View Route & Live Telemetry</span>
+                            </button>
                           )}
 
                           {/* Festival Pre-Stock Button */}
@@ -524,7 +583,7 @@ export default function NotificationDropdown({ onRestockComplete }) {
                                 className="bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold px-3 py-1.5 rounded-lg text-label-sm flex items-center gap-1.5 shadow-md shadow-purple-600/20 transition-all cursor-pointer disabled:opacity-50"
                               >
                                 {isBusy ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                                <span>1-Click Pre-Stock (+{n.suggested_qty || 600} units)</span>
+                                <span>1-Click Festival Reorder (+{n.suggested_qty || 600} units)</span>
                               </button>
                             ) : (
                               <span className="text-emerald-400 font-bold text-[11px] font-mono flex items-center gap-1 bg-emerald-500/15 px-2 py-1 rounded-md border border-emerald-500/30">
