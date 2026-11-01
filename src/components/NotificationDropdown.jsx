@@ -124,15 +124,19 @@ export default function NotificationDropdown({ onRestockComplete }) {
       {/* Bell Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full transition-all relative cursor-pointer"
+        className={`w-10 h-10 flex items-center justify-center rounded-full transition-all relative cursor-pointer ${
+          counts.unread_count > 0
+            ? 'text-primary bg-primary/10 ring-2 ring-primary/40 shadow-lg shadow-primary/25'
+            : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+        }`}
         title="Manager Operational Notification Hub"
         aria-label="Notifications"
       >
-        <Bell className="w-5 h-5" />
+        <Bell className={`w-5 h-5 ${counts.unread_count > 0 ? 'animate-bounce' : ''}`} />
 
         {/* Unread Counter Badge */}
         {counts.unread_count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1 bg-error text-on-error rounded-full text-[11px] font-bold font-mono flex items-center justify-center shadow-md animate-pulse">
+          <span className="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1 bg-error text-on-error rounded-full text-[11px] font-bold font-mono flex items-center justify-center shadow-md ring-2 ring-surface animate-pulse">
             {counts.unread_count > 99 ? '99+' : counts.unread_count}
           </span>
         )}

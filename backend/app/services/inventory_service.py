@@ -225,3 +225,23 @@ class InventoryService:
                 )
             )
         return reorders
+
+    @staticmethod
+    def restock_item(db: Session, product_code: str, quantity: int = 500) -> Optional[Inventory]:
+        """Restocks inventory item in the database and clears high risk."""
+        item = db.query(Inventory).filter(
+            (Inventory.product_code == product_code) | (Inventory.name == product_code)
+        ).first()
+        if item:
+            item.current_stock = (item.current_stock or 0) + quantity
+            item.risk = "HEALTHY"
+            item.action = "Optimal level"
+            if item.forecast_demand and item.forecast_demand > 0:
+                item.days_remaining = int((item.current_stock / item.forecast_demand) * 30)
+            else:
+                item.days_remaining = max(item.days_remaining or 15, 15)
+            db.commit()
+            db.refresh(item)
+            return item
+        return None
+

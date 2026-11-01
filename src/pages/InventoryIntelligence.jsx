@@ -8,6 +8,7 @@ import {
   BarChart3, Search, Download, Zap, RotateCw, CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useLiveNotifications } from '../context/NotificationContext';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, Cell
 } from 'recharts';
@@ -21,6 +22,7 @@ export default function InventoryIntelligence() {
   const [restockingAll, setRestockingAll] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
   const navigate = useNavigate();
+  const { handleRestock } = useLiveNotifications();
 
   useEffect(() => {
     let isMounted = true;
@@ -51,9 +53,12 @@ export default function InventoryIntelligence() {
     setRestockingId(item.product_id);
     try {
       const qty = item.suggested_reorder_qty || 500;
-      const res = await api.restockProduct({
+      // Trigger global live notification, toast chime, navbar bell activation, and phone push
+      const res = await handleRestock({
         product_id: item.product_id,
-        quantity: qty,
+        product_name: item.product_name,
+        suggested_qty: qty,
+        current_stock: item.current_stock,
       });
 
       if (res && res.success) {
@@ -111,9 +116,11 @@ export default function InventoryIntelligence() {
     setRestockingAll(true);
     try {
       for (const it of stockoutItems) {
-        await api.restockProduct({
+        await handleRestock({
           product_id: it.product_id,
-          quantity: it.suggested_reorder_qty || 500,
+          product_name: it.product_name,
+          suggested_qty: it.suggested_reorder_qty || 500,
+          current_stock: it.current_stock,
         });
       }
       setToastMessage(`1-Click Reorder All Executed: All ${stockoutItems.length} critical stockouts successfully restocked!`);

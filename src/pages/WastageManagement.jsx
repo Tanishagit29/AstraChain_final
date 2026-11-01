@@ -8,6 +8,7 @@ import {
   BarChart3, CheckCircle2, Flame, Search, ArrowRight, Plus, X, Sparkles, Clock, Package
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useLiveNotifications } from '../context/NotificationContext';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, Cell
 } from 'recharts';
@@ -27,6 +28,7 @@ export default function WastageManagement() {
   const [filterDecision, setFilterDecision] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [actionSuccess, setActionSuccess] = useState(null);
+  const { handleMitigateWastage } = useLiveNotifications();
 
   // Modal & Form State for Adding Near-Expiry Items
   const [showAddModal, setShowAddModal] = useState(false);
@@ -115,12 +117,13 @@ export default function WastageManagement() {
 
   const handleApplyDiscountAction = async (item) => {
     try {
-      await api.executeKeyAction({
-        action_type: 'DISCOUNT_SUGGESTION',
-        target_id: item.product_id || item.product_name,
-        details: `Dynamic promo markdown applied for batch ${item.product_name}`
+      // Trigger global live notification toast, navbar bell button activation, and phone push
+      await handleMitigateWastage({
+        product_id: item.product_id || item.product_name,
+        product_name: item.product_name,
+        discount_recommended: item.discount || '30% Dynamic Markdown',
       });
-      setActionSuccess(`Promo Markdown Applied: ${item.product_name} (${item.discount})`);
+      setActionSuccess(`1-Click Clearance Activated: ${item.product_name} (${item.discount || 'Priority Transit'})`);
       setTimeout(() => setActionSuccess(null), 4000);
     } catch (e) {
       console.error('Failed to execute discount action:', e);
@@ -693,12 +696,13 @@ export default function WastageManagement() {
                 <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Decision</th>
                 <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Expiry Urgency</th>
                 <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">Reason & Agent Intervention</th>
+                <th className="px-lg py-md text-label-sm text-on-surface-variant uppercase font-mono">1-Click Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30 text-body-md">
               {filteredDecisions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-lg py-xl text-center text-on-surface-variant italic">
+                  <td colSpan={8} className="px-lg py-xl text-center text-on-surface-variant italic">
                     No wastage item decisions match the current filter or search query.
                   </td>
                 </tr>
@@ -747,6 +751,26 @@ export default function WastageManagement() {
                     </td>
                     <td className="px-lg py-md text-on-surface-variant max-w-xs truncate" title={item.reason}>
                       {item.reason}
+                    </td>
+                    <td className="px-lg py-md">
+                      {item.days_remaining !== null && item.days_remaining <= 5 && item.days_remaining >= 0 ? (
+                        <button
+                          onClick={() => handleApplyDiscountAction(item)}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 flex items-center gap-1 transition-all cursor-pointer shadow-sm active:scale-95"
+                          title="1-Click Expedited Transit & Volume Liquidation"
+                        >
+                          <Zap className="w-3 h-3" />
+                          <span>1-Click Mitigate</span>
+                        </button>
+                      ) : item.days_remaining !== null && item.days_remaining < 0 ? (
+                        <span className="text-[11px] font-mono text-error font-bold px-2 py-0.5 rounded bg-error/10 border border-error/20">
+                          Quarantined
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-mono text-emerald-400 font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+                          Safe Stock
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))

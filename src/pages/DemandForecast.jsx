@@ -9,6 +9,7 @@ import {
   SlidersHorizontal, CheckCircle2, Layers, Sparkle, ArrowRight, RotateCw
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLiveNotifications } from '../context/NotificationContext';
 
 const FESTIVAL_OPTIONS = [
   'Diwali',
@@ -41,6 +42,7 @@ function FestivalItemDemandPredictor() {
   const [reorderedIds, setReorderedIds] = useState(new Set());
   const [reorderingAll, setReorderingAll] = useState(false);
   const [festivalToast, setFestivalToast] = useState(null);
+  const { handlePrestockFestival } = useLiveNotifications();
 
   useEffect(() => {
     let isMounted = true;
@@ -181,10 +183,11 @@ function FestivalItemDemandPredictor() {
                 setReorderingAll(true);
                 try {
                   for (const item of itemDemandData.items) {
-                    await api.prestockFestival({
+                    await handlePrestockFestival({
                       product_id: item.product_id,
+                      product_name: item.product_name,
                       festival_name: selectedFestival,
-                      quantity: item.extra_units_needed || 600,
+                      suggested_qty: item.extra_units_needed || 600,
                     });
                   }
                   setReorderedIds(new Set(itemDemandData.items.map(i => i.product_id)));
@@ -288,10 +291,11 @@ function FestivalItemDemandPredictor() {
                           onClick={async () => {
                             setReorderingId(item.product_id);
                             try {
-                              await api.prestockFestival({
+                              await handlePrestockFestival({
                                 product_id: item.product_id,
+                                product_name: item.product_name,
                                 festival_name: selectedFestival,
-                                quantity: item.extra_units_needed || 600,
+                                suggested_qty: item.extra_units_needed || 600,
                               });
                               setReorderedIds((prev) => new Set(prev).add(item.product_id));
                               setFestivalToast(`Reordered +${item.extra_units_needed || 600} units of ${item.product_name} for ${selectedFestival}!`);

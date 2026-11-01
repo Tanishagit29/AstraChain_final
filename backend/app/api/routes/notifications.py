@@ -120,14 +120,16 @@ async def dispatch_phone_push(title: str, message: str, alert_type: str, product
         tags = "truck,checkered_flag"
         actions = [f"view, Track Route, {app_url}/routes"]
     else:
-        priority = "urgent" if "STOCKOUT" in atype or "WASTAGE" in atype else ("high" if "FESTIVAL" in atype else "default")
+        priority = "urgent" if "STOCKOUT" in atype or "WASTAGE" in atype else "high"
         tags = "warning,rotating_light" if "STOCKOUT" in atype else ("package,white_check_mark" if "RESTOCK" in atype else ("apple,warning" if "WASTAGE" in atype else "party_popper,sparkles"))
         actions = [f"view, Open Dashboard, {app_url}"]
-        if product_id and "STOCKOUT" in atype:
+        if "RESTOCK" in atype:
+            actions.insert(0, f"view, View Restocked Inventory, {app_url}/inventory")
+        elif product_id and "STOCKOUT" in atype:
             actions.insert(0, f"view, 1-Click Reorder, {app_url}/inventory")
         elif product_id and "WASTAGE" in atype:
             actions.insert(0, f"view, Expiry Monitoring, {app_url}/wastage")
-        elif product_id and "FESTIVAL" in atype:
+        elif "FESTIVAL" in atype:
             actions.insert(0, f"view, 1-Click Festival Reorder, {app_url}/demand-forecast?mode=festival")
 
     headers = {
@@ -754,6 +756,7 @@ async def restock_stockout_product(
         "is_read": False,
         "is_restocked": True
     }
+    SIMULATED_NOTIFICATIONS.insert(0, live_notif)
     await broadcast_live_event("RESTOCK_COMPLETED", live_notif, {"product_id": target_id, "quantity": qty, "new_stock": new_stock})
 
     return {
@@ -763,7 +766,8 @@ async def restock_stockout_product(
         "product_name": product_name,
         "quantity_added": qty,
         "new_stock": new_stock,
-        "status": "Optimal Stock"
+        "status": "Optimal Stock",
+        "notification": live_notif
     }
 
 
@@ -834,6 +838,7 @@ async def mitigate_wastage_alert(
         "is_read": False,
         "is_mitigated": True
     }
+    SIMULATED_NOTIFICATIONS.insert(0, live_notif)
     await broadcast_live_event("WASTAGE_MITIGATED", live_notif, {"product_id": target_id, "discount": discount})
 
     return {
@@ -842,7 +847,8 @@ async def mitigate_wastage_alert(
         "product_id": target_id,
         "product_name": product_name,
         "discount_applied": discount,
-        "status": "Markdown Active"
+        "status": "Markdown Active",
+        "notification": live_notif
     }
 
 
@@ -918,6 +924,7 @@ async def prestock_festival_recommendation(
         "is_read": False,
         "is_prestocked": True
     }
+    SIMULATED_NOTIFICATIONS.insert(0, live_notif)
     await broadcast_live_event("FESTIVAL_PRESTOCKED", live_notif, {"product_id": target_id, "festival": fest_name, "quantity": qty})
 
     return {
@@ -927,7 +934,8 @@ async def prestock_festival_recommendation(
         "product_name": product_name,
         "festival_name": fest_name,
         "quantity_added": qty,
-        "status": "Buffer Stocked"
+        "status": "Buffer Stocked",
+        "notification": live_notif
     }
 
 

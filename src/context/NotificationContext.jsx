@@ -220,23 +220,24 @@ export function NotificationProvider({ children }) {
         updated[existsIndex] = { ...updated[existsIndex], ...notification };
         return updated;
       }
-      return [notification, ...prev];
-    });
 
-    // 4. Update badge counts
-    setCounts((prev) => {
-      const isUnread = !notification.is_read;
-      const type = notification.type;
-      return {
-        ...prev,
-        unread_count: isUnread ? prev.unread_count + 1 : prev.unread_count,
-        stockout_count: type === 'STOCKOUT' ? prev.stockout_count + 1 : prev.stockout_count,
-        wastage_count: type === 'WASTAGE' ? prev.wastage_count + 1 : prev.wastage_count,
-        festival_count: type === 'FESTIVAL' ? prev.festival_count + 1 : prev.festival_count,
-        restocked_count: type === 'RESTOCKED' ? prev.restocked_count + 1 : prev.restocked_count,
-        route_count: (type === 'ROUTE_ARRIVAL' || type === 'ROUTE') ? prev.route_count + 1 : prev.route_count,
-        total: prev.total + 1,
-      };
+      // 4. Update badge counts when new item arrives
+      setCounts((prevCounts) => {
+        const isUnread = !notification.is_read;
+        const type = notification.type;
+        return {
+          ...prevCounts,
+          unread_count: isUnread ? prevCounts.unread_count + 1 : prevCounts.unread_count,
+          stockout_count: type === 'STOCKOUT' ? prevCounts.stockout_count + 1 : prevCounts.stockout_count,
+          wastage_count: type === 'WASTAGE' ? prevCounts.wastage_count + 1 : prevCounts.wastage_count,
+          festival_count: type === 'FESTIVAL' ? prevCounts.festival_count + 1 : prevCounts.festival_count,
+          restocked_count: type === 'RESTOCKED' ? prevCounts.restocked_count + 1 : prevCounts.restocked_count,
+          route_count: (type === 'ROUTE_ARRIVAL' || type === 'ROUTE') ? prevCounts.route_count + 1 : prevCounts.route_count,
+          total: prevCounts.total + 1,
+        };
+      });
+
+      return [notification, ...prev];
     });
   }, [playChime, addToast]);
 
@@ -313,7 +314,7 @@ export function NotificationProvider({ children }) {
   // 1-Click Restock
   const handleRestock = async (item) => {
     if (!item?.product_id) return null;
-    const qty = item.suggested_qty || 500;
+    const qty = item.suggested_qty || item.suggested_reorder_qty || 500;
     try {
       const res = await api.restockProduct({
         product_id: item.product_id,
@@ -322,19 +323,47 @@ export function NotificationProvider({ children }) {
       });
 
       if (res && res.success) {
-        setNotifications((prev) =>
-          prev.map((n) =>
+        const liveNotif = res.notification || {
+          id: `restock-${Date.now()}`,
+          title: `Restocked: ${res.product_name || item.product_name || item.product_id}`,
+          message: `Manager Daksh Mehta replenished +${qty.toLocaleString()} units. Warehouse balance updated to ${(res.new_stock || (item.current_stock || 0) + qty).toLocaleString()} units. Status: Optimal Stock.`,
+          type: 'RESTOCKED',
+          severity: 'SUCCESS',
+          product_id: item.product_id,
+          product_name: res.product_name || item.product_name || item.product_id,
+          quantity_added: qty,
+          new_stock: res.new_stock,
+          timestamp: 'Just now',
+          badge: 'Restocked',
+          is_read: false,
+          is_restocked: true,
+        };
+
+        // 1. Immediately pop up live floating toast on screen
+        addToast(liveNotif);
+
+        // 2. Prepend live notification to notifications list and update existing stockout
+        setNotifications((prev) => {
+          const updated = prev.map((n) =>
             n.product_id === item.product_id || n.id === item.id
               ? { ...n, is_restocked: true, can_restock: false, is_read: true, badge: 'Restocked' }
               : n
-          )
-        );
+          );
+          if (!updated.some((n) => n.id === liveNotif.id)) {
+            return [liveNotif, ...updated];
+          }
+          return updated;
+        });
+
+        // 3. Make Notification Button live: increment unread_count and restocked_count
         setCounts((prev) => ({
           ...prev,
           stockout_count: Math.max(0, prev.stockout_count - 1),
           restocked_count: prev.restocked_count + 1,
-          unread_count: Math.max(0, prev.unread_count - 1),
+          unread_count: prev.unread_count + 1,
+          total: prev.total + 1,
         }));
+
         playChime('success');
         return res;
       }
@@ -356,18 +385,45 @@ export function NotificationProvider({ children }) {
       });
 
       if (res && res.success) {
-        setNotifications((prev) =>
-          prev.map((n) =>
+        const liveNotif = res.notification || {
+          id: `wastage-mitigated-${Date.now()}`,
+          title: `Markdown Active: ${res.product_name || item.product_name || item.product_id}`,
+          message: `Dynamic promo discount (${discount}) is now active. Stock flagged for priority retail liquidation.`,
+          type: 'WASTAGE',
+          severity: 'SUCCESS',
+          product_id: item.product_id,
+          product_name: res.product_name || item.product_name || item.product_id,
+          discount_applied: discount,
+          timestamp: 'Just now',
+          badge: 'Markdown Active',
+          is_read: false,
+          is_mitigated: true,
+        };
+
+        // 1. Pop up live floating toast
+        addToast(liveNotif);
+
+        // 2. Prepend live notification to notifications list
+        setNotifications((prev) => {
+          const updated = prev.map((n) =>
             n.product_id === item.product_id || n.id === item.id
               ? { ...n, is_mitigated: true, can_mitigate: false, is_read: true, badge: 'Markdown Active' }
               : n
-          )
-        );
+          );
+          if (!updated.some((n) => n.id === liveNotif.id)) {
+            return [liveNotif, ...updated];
+          }
+          return updated;
+        });
+
+        // 3. Make Notification Button live
         setCounts((prev) => ({
           ...prev,
           wastage_count: Math.max(0, prev.wastage_count - 1),
-          unread_count: Math.max(0, prev.unread_count - 1),
+          unread_count: prev.unread_count + 1,
+          total: prev.total + 1,
         }));
+
         playChime('success');
         return res;
       }
@@ -380,7 +436,7 @@ export function NotificationProvider({ children }) {
   // 1-Click Festival Surge Pre-Stock
   const handlePrestockFestival = async (item) => {
     if (!item?.product_id) return null;
-    const qty = item.suggested_qty || 600;
+    const qty = item.suggested_qty || item.extra_units_needed || 600;
     const festName = item.festival_name || 'Diwali';
     try {
       const res = await api.prestockFestival({
@@ -391,19 +447,47 @@ export function NotificationProvider({ children }) {
       });
 
       if (res && res.success) {
-        setNotifications((prev) =>
-          prev.map((n) =>
+        const liveNotif = res.notification || {
+          id: `fest-prestocked-${Date.now()}`,
+          title: `Buffer Stocked: ${res.product_name || item.product_name || item.product_id}`,
+          message: `+${qty.toLocaleString()} units safety stock allocated for ${festName} demand surge. Fulfillment ready.`,
+          type: 'FESTIVAL',
+          severity: 'SUCCESS',
+          product_id: item.product_id,
+          product_name: res.product_name || item.product_name || item.product_id,
+          festival_name: festName,
+          quantity_added: qty,
+          timestamp: 'Just now',
+          badge: 'Buffer Stocked',
+          is_read: false,
+          is_prestocked: true,
+        };
+
+        // 1. Pop up live floating toast
+        addToast(liveNotif);
+
+        // 2. Prepend live notification to notifications list
+        setNotifications((prev) => {
+          const updated = prev.map((n) =>
             n.product_id === item.product_id || n.id === item.id
               ? { ...n, is_prestocked: true, can_prestock: false, is_read: true, badge: 'Buffer Stocked' }
               : n
-          )
-        );
+          );
+          if (!updated.some((n) => n.id === liveNotif.id)) {
+            return [liveNotif, ...updated];
+          }
+          return updated;
+        });
+
+        // 3. Make Notification Button live
         setCounts((prev) => ({
           ...prev,
-          festival_count: Math.max(0, prev.festival_count - 1),
-          unread_count: Math.max(0, prev.unread_count - 1),
+          festival_count: prev.festival_count + 1,
+          unread_count: prev.unread_count + 1,
+          total: prev.total + 1,
         }));
-        playChime('success');
+
+        playChime('festival');
         return res;
       }
     } catch (err) {
