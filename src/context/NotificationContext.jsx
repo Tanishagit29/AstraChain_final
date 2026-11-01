@@ -450,7 +450,7 @@ export function NotificationProvider({ children }) {
       const res = await api.simulateNotification(type, details);
       if (res && res.notification) {
         // Will be delivered by WebSocket; in case WS is pending, also insert locally
-        if (!isWsConnected) {
+        if (true) {
           handleLiveEvent({ event: `${type.toUpperCase()}_ALERT`, notification: res.notification });
         }
       }

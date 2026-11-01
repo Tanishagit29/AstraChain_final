@@ -13,6 +13,7 @@ from app.api.routes.data_collection import router as data_collection_router
 from app.api.routes.multi_agent import router as multi_agent_router
 from app.api.routes.pipeline import router as pipeline_router
 from app.api.routes.rio_mart import router as rio_mart_router
+from app.api.routes.notifications import router as notifications_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
@@ -29,5 +30,4 @@ api_router.include_router(data_collection_router)
 api_router.include_router(multi_agent_router)
 api_router.include_router(pipeline_router)
 api_router.include_router(rio_mart_router)
-
-
+api_router.include_router(notifications_router)
