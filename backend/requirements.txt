@@ -20,4 +20,5 @@ xlrd>=2.0.1
 lxml>=5.0.0
 python-calamine>=0.8.0
 groq>=0.9.0
+psycopg[binary]>=3.2.0
 

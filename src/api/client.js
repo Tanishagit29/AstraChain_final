@@ -264,12 +264,19 @@ export const api = {
     });
   },
 
+
   getNotificationWsUrl: () => {
+    if (import.meta.env.VITE_WS_URL) {
+      return import.meta.env.VITE_WS_URL;
+    }
+
     if (typeof window !== 'undefined' && window.location) {
       const host = window.location.hostname;
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+
       return `${proto}//${host}:8000/api/notifications/ws`;
     }
+
     return 'ws://127.0.0.1:8000/api/notifications/ws';
   },
 
